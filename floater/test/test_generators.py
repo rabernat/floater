@@ -52,3 +52,9 @@ def test_hexmesh(fs):
     assert np.allclose(y[0,0], fs.ylim[0] + fs.dy/2.)
     # make sure things are "rectangular"
     assert np.allclose(x[0], x[1] + fs.dx/2)
+
+def test_area(fs):
+    """Kind of just a placeholder. Doesn't check actual values."""
+
+    a = fs.parcel_area()
+    assert np.all(a > 0)
