@@ -9,4 +9,16 @@ Transcode [MITgcm float output](http://mitgcm.org/) into:
 * [pandas](http://pandas.pydata.org/) HDF5 format
 * [bcolz](http://bcolz.blosc.org/)
 
+Transcoding is done via the `floater_convert` script, which is installed with the package.
+
+```bash
+$ floater_convert
+usage: floater_convert [-h] [--float_file_prefix PREFIX] [--float_buf_dim N]
+                       [--progress] [--input_dir DIR] [--output_format FMT]
+                       [--keep_fields FIELDS]
+                       output_file
+```
+
 Also generators and analysis tools for Lagrangian trajectories.
+
+
