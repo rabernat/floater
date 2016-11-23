@@ -1,7 +1,8 @@
 """For generating grids of floats."""
 
 import numpy as np
-from sklearn.neighbors import KDTree
+from scipy.spatial import KDTree
+
 
 def geo_to_xyz(geo_cord):
     lon_deg, lat_deg = geo_cord.transpose()
@@ -75,10 +76,21 @@ class FloatSet(object):
     def get_hexcoords(self, mask, mask_grid_x, mask_grid_y):
         """Get the coordinates of float positions taking into account the land mask.
 
+        PARAMETERS
+        ----------
+        mask : np.ndarray of bools
+            2d array of shape len(mask_grid_x) by len(mask_grid_y).
+            An element is True iff the corresponding grid point is unmasked (ocean)
+        mask_grid_x :
+            1d array of the mask grid longitudes 
+        mask_grid_y :
+            1d array of the mask grid latitudes 
+
         RETURNS
         -------
         floats_ocean: np.ndarray
-            1D array of float coordinate subarrays: [lat, lon] 
+            1D array of float coordinate subarrays:
+            e.g. floats_ocean[i] = [some_float_lon, some_float_lat] 
         """
 
         xx, yy = self.get_rectmesh()
@@ -96,7 +108,7 @@ class FloatSet(object):
         queries_xyz = geo_to_xyz(floats_geo)
 
         # search for 4 nearest neighbors
-        neighbor_indices = mask_tree.query(queries_xyz, k=4, return_distance=False) 
+        dist, neighbor_indices = mask_tree.query(queries_xyz, k=4) 
         neighbor_bools = np.take(mask_bool_flat, neighbor_indices.ravel(), axis=0) # True -> neighbor is ocean
         neighbor_bools = np.reshape(neighbor_bools, (-1, 4)) # reconstruct subarrays of 4 neighbors 
         ocean_bools = np.any(neighbor_bools, axis=1) # OR statement on each subarray of 4 neighbors
