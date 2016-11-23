@@ -1,6 +1,27 @@
 """For generating grids of floats."""
 
 import numpy as np
+from sklearn.neighbors import KDTree
+
+def geo_to_xyz(geo_cord):
+    lon_deg, lat_deg = geo_cord.transpose()
+    lat = np.radians(lat_deg)
+    lon = np.radians(lon_deg)
+    x = np.cos(lat)*np.cos(lon)
+    y = np.cos(lat)*np.sin(lon)
+    z = np.sin(lat)
+    xyz_cord = np.transpose(np.array((x,y,z)))
+    return xyz_cord
+
+def xyz_to_geo(xyz_coord):
+    x,y,z = xyz_coord.transpose()
+    lat = np.arcsin(z)
+    lon = np.arctan2(y,x)
+    lon_deg = np.degrees(lon)
+    lat_deg = np.degrees(lat)
+    geo_cord = np.transpose(np.array((lon_deg, lat_deg)))
+    return geo_cord
+
 
 class FloatSet(object):
     """Represents a set of initial float positions on a regular grid."""
@@ -49,6 +70,39 @@ class FloatSet(object):
         """
 
         return np.meshgrid(self.x, self.y)
+
+
+    def get_hexcoords(self, mask, mask_grid_x, mask_grid_y):
+        """Get the coordinates of float positions taking into account the land mask.
+
+        RETURNS
+        -------
+        floats_ocean: np.ndarray
+            1D array of float coordinate subarrays: [lat, lon] 
+        """
+
+        xx, yy = self.get_rectmesh()
+        # modify to be even-R horizontal offset
+        xx[::2] += self.dx/4
+        xx[1::2] -= self.dx/4
+
+        mask_lon = mask_grid_x
+        mask_lat = mask_grid_y 
+        mask_geo = np.dstack(np.meshgrid(mask_lon, mask_lat)).reshape(-1, 2) # fast cartesian product
+        mask_bool_flat = mask.ravel()
+        mask_xyz = geo_to_xyz(mask_geo) 
+        mask_tree = KDTree(mask_xyz) # a KDTree of the mask data in xyz form 
+        floats_geo = np.transpose([xx.ravel(), yy.ravel()]) # uniform hexagonal tiling   
+        queries_xyz = geo_to_xyz(floats_geo)
+
+        # search for 4 nearest neighbors
+        neighbor_indices = mask_tree.query(queries_xyz, k=4, return_distance=False) 
+        neighbor_bools = np.take(mask_bool_flat, neighbor_indices.ravel(), axis=0) # True -> neighbor is ocean
+        neighbor_bools = np.reshape(neighbor_bools, (-1, 4)) # reconstruct subarrays of 4 neighbors 
+        ocean_bools = np.any(neighbor_bools, axis=1) # OR statement on each subarray of 4 neighbors
+        floats_ocean = floats_geo[np.nonzero(ocean_bools.astype('int'))]
+
+        return floats_ocean 
 
     def get_hexmesh(self):
         """Get the coordinates of the float positions in a hexagonal mesh.
