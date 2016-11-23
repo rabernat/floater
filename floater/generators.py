@@ -106,7 +106,7 @@ class FloatSet(object):
         mask_lon = mask_grid_x
         mask_lat = mask_grid_y 
         mask_geo = np.dstack(np.meshgrid(mask_lon, mask_lat)).reshape(-1, 2) # fast cartesian product
-        mask_bool_flat = mask.ravel()
+        mask_bool_flat = mask.ravel('F')
         mask_xyz = geo_to_xyz(mask_geo) 
         mask_tree = KDTree(mask_xyz) # a KDTree of the mask data in xyz form 
         floats_geo = np.transpose([xx.ravel(), yy.ravel()]) # uniform hexagonal tiling   
@@ -198,7 +198,7 @@ class FloatSet(object):
             lon = myx.ravel()
             lat = yy.ravel()
         else:
-            if np.shape(mask) == [len(mask_grid_x), len(mask_grid_y)]:
+            if mask.shape == (len(mask_grid_x), len(mask_grid_y)):
                     lon, lat = np.transpose(self.get_oceancoords(mesh, mask, mask_grid_x, mask_grid_y))
             else:
                 raise ValueError('dimensions of mask shoud be len(mask_grid_x) by len(mask_grid_y)')
@@ -224,7 +224,9 @@ class FloatSet(object):
         #tstart = 259200;
 
         # number of floats
-        N = self.Nx * self.Ny
+        # previous way: N = self.Nx * self.Ny
+        # which was was wrong for masked cases
+        N = len(lon)
 
         output_dtype = np.dtype('>f4')
         # for all the float data
