@@ -128,7 +128,7 @@ class FloatSet(object):
     	if mesh == 'hex':
         	xx, yy = self.get_hexmesh()
     	else:
-        	xx, yy = np.get_rectmesh()
+        	xx, yy = self.get_rectmesh()
         myx = xx
 
     	ini_times = 1

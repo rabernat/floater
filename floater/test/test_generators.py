@@ -1,5 +1,6 @@
 from floater import generators as gen
 import numpy as np
+import os
 import pytest
 
 # these are all combinations of (xlim, ylim, dx, dy) that will be fed to the
@@ -16,7 +17,6 @@ import pytest
     ((-60.,-50.), (33.,40.5), 0.02, 0.015)
 ])
 def fs(request):
-    print(request.param)
     xlim, ylim, dx, dy = request.param
     return gen.FloatSet(xlim, ylim, dx, dy)
 
@@ -58,3 +58,14 @@ def test_area(fs):
 
     a = fs.parcel_area()
     assert np.all(a > 0)
+
+def test_to_mitgcm_format(fs, tmpdir):
+    for mesh in ['rect', 'hex']:
+        for iup in [-1, 0, 1]:
+            filename = str(tmpdir.join('ini_flt_pos_%s_%g.bin' % (mesh, iup)))
+            fs.to_mitgcm_format(filename, mesh=mesh, iup=iup)
+	    assert os.path.exists(filename)
+            array = np.fromfile(filename, dtype='>f4')
+            assert len(array)==(fs.Nx*fs.Ny + 1 )* 9
+	    # TODO : check each element of this array and 
+            # check that the values are correct.   
