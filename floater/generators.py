@@ -118,7 +118,6 @@ class FloatSet(object):
 	mesh : choice of mesh
 	 - 'rect' : rectangular cartesian
 	 - 'hex' : hexagonal
-         - should profile ( > 0 = return cycle (in s) to surface)
 
 	"""	
 	
