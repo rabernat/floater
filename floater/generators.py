@@ -113,6 +113,8 @@ class FloatSet(object):
          - should be advected WITHOUT additional noise (= -2 ); 
 	this implies that the float is non-profiling
          - is a mooring ( = -3 ); i.e. the float is not advected
+	 - should profile ( > 0 = return cycle (in s) to surface)
+
 	mesh : choice of mesh
 	 - 'rect' : rectangular cartesian
 	 - 'hex' : hexagonal
