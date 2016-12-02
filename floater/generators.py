@@ -101,27 +101,25 @@ class FloatSet(object):
 	"""Output floatset in MITgcm format
 	PARAMETERS
 	----------
-	filename : The filename to save the floatset data in 
+	filename : string
+		   The filename to save the floatset data in 
 		   (e.g.float.ini.pos.hex.bin)
-	tstart : time for float initialisation (default = 0)
-	iup : flag if the float
-         - should profile ( > 0 = return cycle (in s) to surface)
+	tstart : int
+		   time for float initialisation (default = 0)
+	iup : {0,-1,-2,-3,1}
+		   flag if the float
          - remain at depth ( = 0 )
          - is a 3D float ( = -1 )
          - should be advected WITHOUT additional noise (= -2 ); 
 	this implies that the float is non-profiling
          - is a mooring ( = -3 ); i.e. the float is not advected
+	 - should profile ( > 0 = return cycle (in s) to surface)
+
 	mesh : choice of mesh
 	 - 'rect' : rectangular cartesian
 	 - 'hex' : hexagonal
+
 	"""	
-        # iup: flag if the float
-        # - should profile ( > 0 = return cycle (in s) to surface)
-        # - remain at depth ( = 0 )
-        # - is a 3D float ( = -1 )
-        # - should be advected WITHOUT additional noise (= -2 ); this implies that
-        # the float is non-profiling
-        # - is a mooring ( = -3 ); i.e. the float is not advected
 	
 	# tstart :  initialization
 
@@ -145,7 +143,8 @@ class FloatSet(object):
 
 
     	itop = 0
-    	# end time of integration of float (in s); note if tend = 1 floats are
+    	
+	# end time of integration of float (in s); note if tend = 1 floats are
     	# integrated till the end of the integration;
     	tend = -1;
 
