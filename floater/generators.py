@@ -1,7 +1,7 @@
 """For generating grids of floats."""
 
 import numpy as np
-from scipy.spatial import KDTree
+from scipy.spatial import cKDTree
 
 
 def geo_to_xyz(geo_cord):
@@ -72,23 +72,25 @@ class FloatSet(object):
 
         return np.meshgrid(self.x, self.y)
 
-
-    def get_oceancoords(self, mesh, mask, mask_grid_x, mask_grid_y):
+    #model_grid = {'lon': xc, 'lat': yc, 'land_mask': mask}
+    def get_oceancoords(self, model_grid, mesh='rect'):
         """Get the coordinates of float positions taking into account the land mask.
 
         PARAMETERS
         ----------
-        mask : np.ndarray of bools
-            2d array of dimensions len(mask_grid_x) by len(mask_grid_y).
-            An element is True iff the corresponding grid point is unmasked (ocean)
-        mesh : string
+        model_grid : dictionary 
+            the following key value pairs are expected  
+                'land_mask': np.ndarray of bools
+                    2d array of dimensions len(lon) by len(lat).
+                    An element is True iff the corresponding tracer cell grid point is unmasked (ocean)
+                'lon': 1d array of the mask grid longitudes      
+                'lat': 1d array of the mask grid latitudes
+                     
+         mesh : string
             options are 
                 'rect' - a rectangular mesh, the default 
                 'hex' - a hexagonal mesh 
-        mask_grid_x :
-            1d array of the mask grid longitudes 
-        mask_grid_y :
-            1d array of the mask grid latitudes 
+
 
         RETURNS
         -------
@@ -103,20 +105,18 @@ class FloatSet(object):
             xx[::2] += self.dx/4
             xx[1::2] -= self.dx/4
 
-        mask_lon = mask_grid_x
-        mask_lat = mask_grid_y 
+        mask_lon = model_grid['lon'] 
+        mask_lat = model_grid['lat'] 
+        land_mask = model_grid['land_mask']
         mask_geo = np.dstack(np.meshgrid(mask_lon, mask_lat)).reshape(-1, 2) # fast cartesian product
-        mask_bool_flat = mask.ravel('F')
-        mask_xyz = geo_to_xyz(mask_geo) 
-        mask_tree = KDTree(mask_xyz) # a KDTree of the mask data in xyz form 
-        floats_geo = np.transpose([xx.ravel(), yy.ravel()]) # uniform hexagonal tiling   
+        mask_bool_flat = land_mask.ravel('F')
+        mask_xyz = geo_to_xyz(mask_geo)
+        mask_tree = cKDTree(mask_xyz) # a KDTree of the mask data in xyz form 
+        floats_geo = np.transpose([xx.ravel(), yy.ravel()]) # uniform hexagonal tiling  
         queries_xyz = geo_to_xyz(floats_geo)
-
-        # search for 4 nearest neighbors
-        dist, neighbor_indices = mask_tree.query(queries_xyz, k=4) 
-        neighbor_bools = np.take(mask_bool_flat, neighbor_indices.ravel(), axis=0) # True -> neighbor is ocean
-        neighbor_bools = np.reshape(neighbor_bools, (-1, 4)) # reconstruct subarrays of 4 neighbors 
-        ocean_bools = np.any(neighbor_bools, axis=1) # OR statement on each subarray of 4 neighbors
+        # search for nearest neighbors
+        dist, neighbor_indices = mask_tree.query(queries_xyz, n_jobs=-1) 
+        ocean_bools = np.take(mask_bool_flat, neighbor_indices.ravel()) # True -> neighbor is tracer ocean
         floats_ocean = floats_geo[np.nonzero(ocean_bools.astype('int'))]
 
         return floats_ocean 
@@ -167,7 +167,7 @@ class FloatSet(object):
             #dx = dy * np.cos(np.radians(lat)) * self.dx * R / 360.
             return dx * dy
 
-    def to_mitgcm_format(self, filename, tstart=0, iup=0, mesh='rect'):
+    def to_mitgcm_format(self, filename, tstart=0, iup=0, mesh='rect', model_grid=None):
 	"""Output floatset in MITgcm format
 	PARAMETERS
 	----------
@@ -184,12 +184,19 @@ class FloatSet(object):
 	mesh : choice of mesh
 	 - 'rect' : rectangular cartesian
 	 - 'hex' : hexagonal
+    model_grid : dictionary 
+        - expected key value pairs   
+            'land_mask': np.ndarray of bools
+                    2d array of dimensions len(lon) by len(lat).
+                    An element is True iff the corresponding tracer cell center point is unmasked (ocean)
+            'lon': 1d array of the model grid tracer center longitudes      
+            'lat': 1d array of the model grid tracer center latitudes
 	"""	
-        if mask is None: 
+        if model_grid is None: 
             if mesh == 'hex':
                 xx, yy = self.get_hexmesh()
             else:
-                xx, yy = np.get_rectmesh()
+                xx, yy = self.get_rectmesh()
             myx = xx
 
             ini_times = 1
@@ -198,11 +205,9 @@ class FloatSet(object):
             lon = myx.ravel()
             lat = yy.ravel()
         else:
-            if mask.shape == (len(mask_grid_x), len(mask_grid_y)):
-                    lon, lat = np.transpose(self.get_oceancoords(mesh, mask, mask_grid_x, mask_grid_y))
-            else:
-                raise ValueError('dimensions of mask shoud be len(mask_grid_x) by len(mask_grid_y)')
-
+            #place floats just in ocean
+            lon, lat = np.transpose(self.get_oceancoords(model_grid, mesh))
+            
         # other float properties
 
         # kpart: depth of float release in meters, depth is negative, i.e. -1500
