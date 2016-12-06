@@ -73,14 +73,18 @@ class FloatSet(object):
         return np.meshgrid(self.x, self.y)
 
 
-    def get_hexcoords(self, mask, mask_grid_x, mask_grid_y):
+    def get_oceancoords(self, mesh, mask, mask_grid_x, mask_grid_y):
         """Get the coordinates of float positions taking into account the land mask.
 
         PARAMETERS
         ----------
         mask : np.ndarray of bools
-            2d array of shape len(mask_grid_x) by len(mask_grid_y).
+            2d array of dimensions len(mask_grid_x) by len(mask_grid_y).
             An element is True iff the corresponding grid point is unmasked (ocean)
+        mesh : string
+            options are 
+                'rect' - a rectangular mesh, the default 
+                'hex' - a hexagonal mesh 
         mask_grid_x :
             1d array of the mask grid longitudes 
         mask_grid_y :
@@ -94,9 +98,10 @@ class FloatSet(object):
         """
 
         xx, yy = self.get_rectmesh()
-        # modify to be even-R horizontal offset
-        xx[::2] += self.dx/4
-        xx[1::2] -= self.dx/4
+
+        if mesh == 'hex':
+            xx[::2] += self.dx/4
+            xx[1::2] -= self.dx/4
 
         mask_lon = mask_grid_x
         mask_lat = mask_grid_y 
@@ -162,7 +167,6 @@ class FloatSet(object):
             #dx = dy * np.cos(np.radians(lat)) * self.dx * R / 360.
             return dx * dy
 
-
     def to_mitgcm_format(self, filename, tstart=0, iup=0, mesh='rect'):
 	"""Output floatset in MITgcm format
 	PARAMETERS
@@ -181,78 +185,77 @@ class FloatSet(object):
 	 - 'rect' : rectangular cartesian
 	 - 'hex' : hexagonal
 	"""	
-        # iup: flag if the float
-        # - should profile ( > 0 = return cycle (in s) to surface)
-        # - remain at depth ( = 0 )
-        # - is a 3D float ( = -1 )
-        # - should be advected WITHOUT additional noise (= -2 ); this implies that
-        # the float is non-profiling
-        # - is a mooring ( = -3 ); i.e. the float is not advected
-	
-	# tstart :  initialization
+        if mask is None: 
+            if mesh == 'hex':
+                xx, yy = self.get_hexmesh()
+            else:
+                xx, yy = np.get_rectmesh()
+            myx = xx
 
-    	if mesh == 'hex':
-        	xx, yy = self.get_hexmesh()
-    	else:
-        	xx, yy = self.get_rectmesh()
-        myx = xx
+            ini_times = 1
 
-    	ini_times = 1
+            # initial positions
+            lon = myx.ravel()
+            lat = yy.ravel()
+        else:
+            if np.shape(mask) == [len(mask_grid_x), len(mask_grid_y)]:
+                    lon, lat = np.transpose(self.get_oceancoords(mesh, mask, mask_grid_x, mask_grid_y))
+            else:
+                raise ValueError('dimensions of mask shoud be len(mask_grid_x) by len(mask_grid_y)')
 
-    	# float properties
+        # other float properties
 
-    	# kpart: depth of float release in meters, depth is negative, i.e. -1500
-    	# for 1500 m
-    	#kpart = -0.5 # for 3d float
-    	kpart = -0.5
+        # kpart: depth of float release in meters, depth is negative, i.e. -1500
+        # for 1500 m
+        #kpart = -0.5 # for 3d float
+        kpart = -0.5
 
-    	# kfloat: target level of float (??)
-    	kfloat = -0.5
+        # kfloat: target level of float (??)
+        kfloat = -0.5
 
+        # itop: time of float at the surface (in s)
 
-    	itop = 0
-    	# end time of integration of float (in s); note if tend = 1 floats are
-    	# integrated till the end of the integration;
-    	tend = -1;
+        itop = 0
+        # end time of integration of float (in s); note if tend = 1 floats are
+        # integrated till the end of the integration;
+        tend = -1;
 
+        # initialization
+        #tstart = 259200;
 
-    	# number of floats
-    	N = self.Nx * self.Ny
+        # number of floats
+        N = self.Nx * self.Ny
 
-    	# initial positions
-    	# (a line along 200 degrees)
-    	lon = myx.ravel()
-    	lat = yy.ravel()
-	output_dtype = np.dtype('>f4')
-    	# for all the float data
-    	flt_matrix = np.zeros((N+1,9), dtype=output_dtype)
+        output_dtype = np.dtype('>f4')
+        # for all the float data
+        flt_matrix = np.zeros((N+1,9), dtype=output_dtype)
 
-    	flt_matrix[1:,0] = np.arange(N)+1
-    	flt_matrix[1:,1] = tstart
-    	flt_matrix[1:,2] = lon
-    	flt_matrix[1:,3] = lat
-    	flt_matrix[1:,4] = kpart
-    	flt_matrix[1:,5] = kfloat
-    	flt_matrix[1:,6] = iup
-    	flt_matrix[1:,7] = itop
-    	flt_matrix[1:,8] = tend
+        flt_matrix[1:,0] = np.arange(N)+1
+        flt_matrix[1:,1] = tstart
+        flt_matrix[1:,2] = lon
+        flt_matrix[1:,3] = lat
+        flt_matrix[1:,4] = kpart
+        flt_matrix[1:,5] = kfloat
+        flt_matrix[1:,6] = iup
+        flt_matrix[1:,7] = itop
+        flt_matrix[1:,8] = tend
 
-    	# first line in initialization file contains a record with
-    	# - the number of floats on that tile in the first record
-    	# - the total number of floats in the sixth record
+        # first line in initialization file contains a record with
+        # - the number of floats on that tile in the first record
+        # - the total number of floats in the sixth record
 
-    	# original
-    	# flt_matrix[0,0] = N;
-    	# flt_matrix[1,0] = -1;
-    	# flt_matrix[5,0] = N;
-    	# flt_matrix[8,0] = -1;
+        # original
+        # flt_matrix[0,0] = N;
+        # flt_matrix[1,0] = -1;
+        # flt_matrix[5,0] = N;
+        # flt_matrix[8,0] = -1;
 
-    	# copied from Andreas
-    	flt_matrix[0,0] = N;
-    	flt_matrix[0,1] = -1
-    	flt_matrix[0,4] = -1
-    	flt_matrix[0,5] = N
-    	flt_matrix[0,8] = -1
+        # copied from Andreas
+        flt_matrix[0,0] = N;
+        flt_matrix[0,1] = -1
+        flt_matrix[0,4] = -1
+        flt_matrix[0,5] = N
+        flt_matrix[0,8] = -1
 
-    	#fname = os.path.join(output_dir, output_fname)
-    	return flt_matrix.tofile(filename)
+        #fname = os.path.join(output_dir, output_fname)
+        return flt_matrix.tofile(filename)
