@@ -56,7 +56,7 @@ def test_hexmesh(fs):
 def test_oceancoords(fs):
     """Verifies that the float grid excludes the masked regions properly."""
 
-    #mask gird is half the spatial resolution of float set
+    #mask grid is half the spatial resolution of float set
     mask_lon = np.linspace(fs.xlim[0], fs.xlim[1], int(fs.Nx/2))
     mask_lat = np.linspace(fs.ylim[0], fs.ylim[1],int(fs.Ny/2))
     mask = np.ones((np.shape(mask_lon)[0], np.shape(mask_lat)[0]))

@@ -72,7 +72,6 @@ class FloatSet(object):
 
         return np.meshgrid(self.x, self.y)
 
-    #model_grid = {'lon': xc, 'lat': yc, 'land_mask': mask}
     def get_oceancoords(self, model_grid, mesh='rect'):
         """Get the coordinates of float positions taking into account the land mask.
 
@@ -168,30 +167,30 @@ class FloatSet(object):
             return dx * dy
 
     def to_mitgcm_format(self, filename, tstart=0, iup=0, mesh='rect', model_grid=None):
-	"""Output floatset in MITgcm format
-	PARAMETERS
-	----------
-	filename : The filename to save the floatset data in 
-		   (e.g.float.ini.pos.hex.bin)
-	tstart : time for float initialisation (default = 0)
-	iup : flag if the float
-         - should profile ( > 0 = return cycle (in s) to surface)
-         - remain at depth ( = 0 )
-         - is a 3D float ( = -1 )
-         - should be advected WITHOUT additional noise (= -2 ); 
-	this implies that the float is non-profiling
-         - is a mooring ( = -3 ); i.e. the float is not advected
-	mesh : choice of mesh
-	 - 'rect' : rectangular cartesian
-	 - 'hex' : hexagonal
-    model_grid : dictionary 
-        - expected key value pairs   
-            'land_mask': np.ndarray of bools
-                    2d array of dimensions len(lon) by len(lat).
-                    An element is True iff the corresponding tracer cell center point is unmasked (ocean)
-            'lon': 1d array of the model grid tracer center longitudes      
-            'lat': 1d array of the model grid tracer center latitudes
-	"""	
+        """Output floatset in MITgcm format
+        PARAMETERS
+        ----------
+        filename : The filename to save the floatset data in 
+               (e.g.float.ini.pos.hex.bin)
+        tstart : time for float initialisation (default = 0)
+        iup : flag if the float
+             - should profile ( > 0 = return cycle (in s) to surface)
+             - remain at depth ( = 0 )
+             - is a 3D float ( = -1 )
+             - should be advected WITHOUT additional noise (= -2 ); 
+        this implies that the float is non-profiling
+             - is a mooring ( = -3 ); i.e. the float is not advected
+        mesh : choice of mesh
+         - 'rect' : rectangular cartesian
+         - 'hex' : hexagonal
+        model_grid : dictionary 
+            - expected key value pairs   
+                'land_mask': np.ndarray of bools
+                        2d array of dimensions len(lon) by len(lat).
+                        An element is True iff the corresponding tracer cell center point is unmasked (ocean)
+                'lon': 1d array of the model grid tracer center longitudes      
+                'lat': 1d array of the model grid tracer center latitudes
+        """ 
         if model_grid is None: 
             if mesh == 'hex':
                 xx, yy = self.get_hexmesh()
