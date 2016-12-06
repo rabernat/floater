@@ -97,17 +97,38 @@ class FloatSet(object):
             return dx * dy
 
 
-    def to_mitgcm_format(self, filename, tstart=0, mesh='rect'):
-    	#xx, yy = np.meshgrid(x, y)
+    def to_mitgcm_format(self, filename, tstart=0, iup=0, mesh='rect'):
+	"""Output floatset in MITgcm format
+	PARAMETERS
+	----------
+	filename : The filename to save the floatset data in 
+		   (e.g.float.ini.pos.hex.bin)
+	tstart : time for float initialisation (default = 0)
+	iup : flag if the float
+         - should profile ( > 0 = return cycle (in s) to surface)
+         - remain at depth ( = 0 )
+         - is a 3D float ( = -1 )
+         - should be advected WITHOUT additional noise (= -2 ); 
+	this implies that the float is non-profiling
+         - is a mooring ( = -3 ); i.e. the float is not advected
+	mesh : choice of mesh
+	 - 'rect' : rectangular cartesian
+	 - 'hex' : hexagonal
+	"""	
+        # iup: flag if the float
+        # - should profile ( > 0 = return cycle (in s) to surface)
+        # - remain at depth ( = 0 )
+        # - is a 3D float ( = -1 )
+        # - should be advected WITHOUT additional noise (= -2 ); this implies that
+        # the float is non-profiling
+        # - is a mooring ( = -3 ); i.e. the float is not advected
+	
+	# tstart :  initialization
 
-    	#if mesh = 'rect':
-    	#    xx, yy = np.meshgrid(x, y)
-    	#    myx = xx
-    	#    #output_fname = 'flt_ini_pos.irreg.bin'
     	if mesh == 'hex':
         	xx, yy = self.get_hexmesh()
     	else:
-        	xx, yy = np.get_rectmesh()
+        	xx, yy = self.get_rectmesh()
         myx = xx
 
     	ini_times = 1
@@ -122,24 +143,12 @@ class FloatSet(object):
     	# kfloat: target level of float (??)
     	kfloat = -0.5
 
-    	# iup: flag if the float
-    	# - should profile ( > 0 = return cycle (in s) to surface)
-    	# - remain at depth ( = 0 )
-    	# - is a 3D float ( = -1 )
-    	# - should be advected WITHOUT additional noise (= -2 ); this implies that
-    	# the float is non-profiling
-    	# - is a mooring ( = -3 ); i.e. the float is not advected
-    	iup = 0;
-
-    	# itop: time of float at the surface (in s)
 
     	itop = 0
     	# end time of integration of float (in s); note if tend = 1 floats are
     	# integrated till the end of the integration;
     	tend = -1;
 
-    	# initialization
-    	#tstart = 259200;
 
     	# number of floats
     	N = self.Nx * self.Ny
