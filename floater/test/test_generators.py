@@ -53,6 +53,52 @@ def test_hexmesh(fs):
     # make sure things are "rectangular"
     assert np.allclose(x[0], x[1] + fs.dx/2)
 
+def test_oceancoords(fs):
+    """Verifies that the float grid excludes the masked regions properly."""
+
+    #mask grid is half the spatial resolution of float set
+    mask_lon = np.linspace(fs.xlim[0], fs.xlim[1], int(fs.Nx/2))
+    mask_lat = np.linspace(fs.ylim[0], fs.ylim[1],int(fs.Ny/2))
+    mask = np.ones((np.shape(mask_lon)[0], np.shape(mask_lat)[0]))
+    
+
+    #fill top half of the domain with land 
+    coast_ind = int(len(mask_lat)/2) #index of coast 
+    coast_lat = mask_lat[coast_ind]
+    for j in range(np.shape(mask)[1]):
+        if j >= coast_ind:
+            mask[:,j] = 0
+    
+    test_model = {'lon': mask_lon, 'lat': mask_lat, 'land_mask': mask}
+
+    #rect grid test 
+    float_x, float_y = np.transpose(fs.get_oceancoords(test_model, mesh='rect'))
+    
+    # check that all floats are within domain 
+    assert np.all((float_x >= fs.xlim[0] ) & ( float_x <= fs.xlim[1] ))
+    assert np.all((float_y >= fs.ylim[0] ) & ( float_y <= fs.ylim[1] ))
+    
+    # check that the floats are beneath the coast (margin of error 2*dy)
+    assert np.all(float_y <= coast_lat+2*fs.dy)
+    
+    #check that there are several floats
+    assert len(float_x) > 1
+    assert len(float_y) > 1
+
+    #hex grid test 
+    float_x, float_y = np.transpose(fs.get_oceancoords(test_model, mesh='hex'))
+    
+    # check that all floats are within domain 
+    assert np.all((float_x >= fs.xlim[0]) & (float_x <= fs.xlim[1]))
+    assert np.all((float_y >= fs.ylim[0]) & (float_y <= fs.ylim[1]))
+    
+    # check that the floats are beneath the coast (margin of error 2*dy)
+    assert np.all(float_y <= coast_lat+2*fs.dy)
+
+    #check that there are several floats
+    assert len(float_x) > 1
+    assert len(float_y) > 1
+        
 def test_area(fs):
     """Kind of just a placeholder. Doesn't check actual values."""
 
