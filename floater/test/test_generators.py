@@ -113,5 +113,7 @@ def test_to_mitgcm_format(fs, tmpdir):
 	    assert os.path.exists(filename)
             array = np.fromfile(filename, dtype='>f4')
             assert len(array)==(fs.Nx*fs.Ny + 1 )* 9
+            npart = fs.N
+            assert int(array[0]) == npart
 	    # TODO : check each element of this array and 
             # check that the values are correct.   
