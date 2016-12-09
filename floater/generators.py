@@ -59,6 +59,7 @@ class FloatSet(object):
         self.x = self.xlim[0] + self.dx * np.arange(self.Nx) + self.dx/2
         self.y = self.ylim[0] + self.dy * np.arange(self.Ny) + self.dy/2
 
+
     def get_rectmesh(self):
         """Get the coordinates of the float positions in a rectangualr mesh.
 
@@ -231,6 +232,8 @@ class FloatSet(object):
         # previous way: N = self.Nx * self.Ny
         # which was was wrong for masked cases
         N = len(lon)
+
+        self.N = N 
 
         output_dtype = np.dtype('>f4')
         # for all the float data
