@@ -240,7 +240,7 @@ class FloatSet(object):
         flt_matrix[0,8] = -1
 
         #fname = os.path.join(output_dir, output_fname)
-        flt_matrix.tofile(filename)
+        return flt_matrix.tofile(filename)
 
 
 def _subset_floats_from_mask(xx, yy, model_grid):
