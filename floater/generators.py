@@ -1,7 +1,5 @@
 """For generating grids of floats."""
 
-from __future__ import print_function
-
 import numpy as np
 from scipy.spatial import cKDTree
 
@@ -101,7 +99,7 @@ class FloatSet(object):
             2D array of float y coordinates
         """
 
-        xx, yy = np.meshgrid(self.x, self.y)
+        xx, yy = self.get_rectmesh()
         # modify to be even-R horizontal offset
         xx[::2] += self.dx/4
         xx[1::2] -= self.dx/4
@@ -177,11 +175,12 @@ class FloatSet(object):
             xx, yy = self.get_hexmesh()
         else:
             xx, yy = self.get_rectmesh()
+        myx = xx
 
         ini_times = 1
 
         # initial positions
-        lon = xx.ravel()
+        lon = myx.ravel()
         lat = yy.ravel()
 
         # other float properties
@@ -209,8 +208,9 @@ class FloatSet(object):
         # which was was wrong for masked cases
         N = len(lon)
 
+        output_dtype = np.dtype(dtype)
         # for all the float data
-        flt_matrix = np.zeros((N+1,9), dtype=dtype)
+        flt_matrix = np.zeros((N+1,9), dtype=output_dtype)
 
         flt_matrix[1:,0] = np.arange(N)+1
         flt_matrix[1:,1] = tstart
@@ -240,7 +240,7 @@ class FloatSet(object):
         flt_matrix[0,8] = -1
 
         #fname = os.path.join(output_dir, output_fname)
-        return flt_matrix.tofile(filename)
+        flt_matrix.tofile(filename)
 
 
 def _subset_floats_from_mask(xx, yy, model_grid):
