@@ -97,7 +97,7 @@ class FloatSet(object):
             2D array of float y coordinates
         """
 
-        xx, yy = self.get_rectmesh()
+        xx, yy = np.meshgrid(self.x, self.y)
         # modify to be even-R horizontal offset
         xx[::2] += self.dx/4
         xx[1::2] -= self.dx/4
@@ -161,21 +161,18 @@ class FloatSet(object):
                 'lon': 1d array of the model grid tracer center longitudes
                 'lat': 1d array of the model grid tracer center latitudes
         """
-        if model_grid is None:
-            if mesh == 'hex':
-                xx, yy = self.get_hexmesh()
-            else:
-                xx, yy = self.get_rectmesh()
-            myx = xx
 
-            ini_times = 1
-
-            # initial positions
-            lon = myx.ravel()
-            lat = yy.ravel()
+        if mesh == 'hex':
+            xx, yy = self.get_hexmesh()
         else:
-            #place floats just in ocean
-            lon, lat = np.transpose(self.get_oceancoords(model_grid, mesh))
+            xx, yy = self.get_rectmesh()
+        myx = xx
+
+        ini_times = 1
+
+        # initial positions
+        lon = myx.ravel()
+        lat = yy.ravel()
 
         # other float properties
 
