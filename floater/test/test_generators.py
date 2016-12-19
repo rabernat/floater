@@ -1,5 +1,3 @@
-import sys
-sys.path.append('/Users/ntarshish/Documents/floater/floater/')
 from floater import generators as gen
 import numpy as np
 import os
