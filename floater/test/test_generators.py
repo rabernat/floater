@@ -54,7 +54,8 @@ def fs_all(request):
 @pytest.fixture(scope='module')
 def fs_big():
     # Nathaniel's funky big domain
-    xlim = (0.0, 180.0)
+    #setup produces N = 16792975, exceeds float32 exact precision
+    xlim = (0.0, 102.5)
     ylim = (-80.0,80.0)
     dx = 1/32.
     dy = 1/32.
