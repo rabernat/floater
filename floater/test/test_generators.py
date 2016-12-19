@@ -166,15 +166,15 @@ def test_to_mitgcm_format(fs_all, tmpdir):
 # Nathaniel's example
 # https://github.com/rabernat/floater/issues/20
 # http://stackoverflow.com/questions/15094611/behavior-of-float-that-is-used-as-an-integer
-# @pytest.mark.skipif("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
-#                     reason="Skipping this test on Travis CI because it's too slow.")
+@pytest.mark.skipif("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
+                    reason="Skipping this test on Travis CI because it's too slow.")
 @pytest.mark.xfail(reason="number of floats too big to represent with 32-bit float")
 def test_big_domain_32bit(fs_big, tmpdir):
     _actually_do_mitgcm_check(fs_big, tmpdir, prec=32)
 
 
-# @pytest.mark.skipif("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
-#                     reason="Skipping this test on Travis CI because it's too slow.")
+@pytest.mark.skipif("TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
+                    reason="Skipping this test on Travis CI because it's too slow.")
 def test_big_domain_64bit(fs_big, tmpdir):
     _actually_do_mitgcm_check(fs_big, tmpdir, prec=64)
 
@@ -199,7 +199,3 @@ def _actually_do_mitgcm_check(single_fs, tmpdir, prec=32):
             # the actual number of floats
             array = array.reshape(-1,9)
             assert int(array[0,0]) == num_floats
-
-        #cleanup by removing `.bin` file
-        os.remove(filename)
-
