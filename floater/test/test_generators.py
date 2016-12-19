@@ -1,3 +1,5 @@
+import sys
+sys.path.append('/Users/ntarshish/Documents/floater/floater/')
 from floater import generators as gen
 import numpy as np
 import os
@@ -199,3 +201,7 @@ def _actually_do_mitgcm_check(single_fs, tmpdir, prec=32):
             # the actual number of floats
             array = array.reshape(-1,9)
             assert int(array[0,0]) == num_floats
+
+        #cleanup by removing `.bin` file
+        os.remove(filename)
+
