@@ -40,7 +40,7 @@ def check_for_openmp():
         cc = os.environ['CC']
     except KeyError:
         cc = 'gcc'
-    with open(filename, 'w', 0) as file:
+    with open(filename, 'w', 1) as file:
         file.write(omp_test)
     with open(os.devnull, 'w') as fnull:
         result = subprocess.call([cc, '-fopenmp', filename],
