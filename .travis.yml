@@ -20,9 +20,9 @@ addons:
       - g++-4.8
 
 env:
-  - CONDA_PACKAGES="numpy scipy cython pandas bcolz pytest future gcc"
+  - CONDA_PACKAGES="numpy scipy cython pandas bcolz pytest future"
 # need to use include
-#  - CC="gcc-4.8"
+  - CC="gcc-4.8"
 
 before_install:
   - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
