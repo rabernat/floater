@@ -97,7 +97,7 @@ class HexArrayRegionTester(unittest.TestCase):
         for pt in bd:
             hr.add_point(pt)
         ib = hr.interior_boundary()
-        print hr.members
+        print(hr.members)
         self.assertSetEqual(ib, bd)
 
     def test_convex(self):
