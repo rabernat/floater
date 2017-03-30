@@ -25,7 +25,7 @@ class HexArrayTester(unittest.TestCase):
                             [0, 1, 5, 7, 6, 3]
                         )
                     else:
-                    self.assertEqual(len(ha.neighbors(n)), 0)
+                        self.assertEqual(len(ha.neighbors(n)), 0)
             if PY3:
                 for n in range(9):
                     if n == 4:
@@ -34,7 +34,7 @@ class HexArrayTester(unittest.TestCase):
                             [0, 1, 5, 7, 6, 3]
                         ) 
                     else:
-                    self.assertEqual(len(ha.neighbors(n)), 0)
+                        self.assertEqual(len(ha.neighbors(n)), 0)
 
     def test_critical_points(self):
         a = _get_test_array()
