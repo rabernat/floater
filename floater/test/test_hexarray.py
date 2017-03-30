@@ -17,15 +17,23 @@ class HexArrayTester(unittest.TestCase):
     def test_neighbors(self):
         for ha in [hexgrid.HexArray(shape=(3,3)),
                    hexgrid.HexArray(np.empty((3,3), dtype=np.float64))]:
+            if PY2:
+                for n in xrange(9):
+                    if n == 4:
+                        self.assertSequenceEqual(
+                            list(ha.neighbors(n)),
+                            [0, 1, 5, 7, 6, 3]
+                        )
+                    else:
+                    self.assertEqual(len(ha.neighbors(n)), 0)
             if PY3:
-                xrange = range
-            for n in xrange(9):
-                if n == 4:
-                    self.assertSequenceEqual(
-                        list(ha.neighbors(n)),
-                        [0, 1, 5, 7, 6, 3]
-                    )
-                else:
+                for n in range(9):
+                    if n == 4:
+                        self.assertSequenceEqual(
+                            list(ha.neighbors(n)),
+                            [0, 1, 5, 7, 6, 3]
+                        ) 
+                    else:
                     self.assertEqual(len(ha.neighbors(n)), 0)
 
     def test_critical_points(self):
