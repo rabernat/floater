@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 from floater import generators as gen
 import numpy as np
 import os

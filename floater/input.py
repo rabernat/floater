@@ -1,5 +1,6 @@
 """Input formats for different types of float data.
 """
+from __future__ import print_function
 
 import numpy as np
 import os

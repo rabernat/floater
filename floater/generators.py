@@ -1,5 +1,7 @@
 """For generating grids of floats."""
 
+from __future__ import print_function
+
 import numpy as np
 from scipy.spatial import cKDTree
 
