@@ -17,8 +17,6 @@ class HexArrayTester(unittest.TestCase):
     def test_neighbors(self):
         for ha in [hexgrid.HexArray(shape=(3,3)),
                    hexgrid.HexArray(np.empty((3,3), dtype=np.float64))]:
-            if PY2:
-                xrange = xrange
             if PY3:
                 xrange = range
             for n in xrange(9):
