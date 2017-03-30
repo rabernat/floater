@@ -117,7 +117,7 @@ def test_land_mask(fs_with_land):
     test_model = fs.model_grid
     # the top half of the domain should be masked
     grid_lat = test_model['lat']
-    coast_lat = grid_lat[len(grid_lat)/2]
+    coast_lat = grid_lat[len(grid_lat)//2]
 
     #rect grid test
     float_x, float_y = fs.get_rectmesh()
