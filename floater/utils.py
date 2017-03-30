@@ -167,7 +167,7 @@ def floats_to_bcolz(input_dir, output_dir, progress=False, **kwargs):
     #output_dtype = _convert_dtype(mfd.out_dtype, 'f4')
     ct = bcolz.fromiter(mfd.generator(progress=progress),
             dtype=mfd.out_dtype,
-            count=mfd.nrecs, mode='w', rootdir=output_dir)
+            count=int(mfd.nrecs), mode='w', rootdir=output_dir)
     return ct
 
 def floats_to_pandas(input_dir, output_fname, progress=False, **kwargs):
