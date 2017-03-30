@@ -20,8 +20,8 @@ domain_geometries = [
 def _generate_model_grid(dg):
     xlim, ylim, dx, dy, _ = dg
     # use half the resoltion of the float set for the mask
-    Nx = int((xlim[1] - xlim[0]) / dx)/2
-    Ny = int((ylim[1] - ylim[0]) / dy)/2
+    Nx = int(int((xlim[1] - xlim[0]) / dx)/2)
+    Ny = int(int((ylim[1] - ylim[0]) / dy)/2)
     lon = np.linspace(xlim[0], xlim[1], Nx)
     lat = np.linspace(ylim[0], ylim[1], Ny)
     mask = np.ones((Ny, Nx), dtype='bool')
