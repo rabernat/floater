@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 from floater import generators as gen
 import numpy as np
 import os
@@ -20,13 +22,13 @@ domain_geometries = [
 def _generate_model_grid(dg):
     xlim, ylim, dx, dy, _ = dg
     # use half the resoltion of the float set for the mask
-    Nx = int((xlim[1] - xlim[0]) / dx)/2
-    Ny = int((ylim[1] - ylim[0]) / dy)/2
+    Nx = int((xlim[1] - xlim[0]) / dx)//2
+    Ny = int((ylim[1] - ylim[0]) / dy)//2
     lon = np.linspace(xlim[0], xlim[1], Nx)
     lat = np.linspace(ylim[0], ylim[1], Ny)
     mask = np.ones((Ny, Nx), dtype='bool')
     # mask the upper half of the domain
-    mask[Ny/2:] = False
+    mask[Ny//2:] = False
     return {'lon': lon, 'lat': lat, 'land_mask': mask}
 
 domain_geometries_with_land = [
@@ -54,7 +56,8 @@ def fs_all(request):
 @pytest.fixture(scope='module')
 def fs_big():
     # Nathaniel's funky big domain
-    xlim = (0.0, 180.0)
+    #setup produces N = 16792975, exceeds float32 exact precision
+    xlim = (0.0, 102.5)
     ylim = (-80.0,80.0)
     dx = 1/32.
     dy = 1/32.
@@ -117,7 +120,7 @@ def test_land_mask(fs_with_land):
     test_model = fs.model_grid
     # the top half of the domain should be masked
     grid_lat = test_model['lat']
-    coast_lat = grid_lat[len(grid_lat)/2]
+    coast_lat = grid_lat[len(grid_lat)//2]
 
     #rect grid test
     float_x, float_y = fs.get_rectmesh()

@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import unittest
 import numpy as np
 from floater import hexgrid
@@ -16,12 +18,12 @@ class HexArrayTester(unittest.TestCase):
     def test_neighbors(self):
         for ha in [hexgrid.HexArray(shape=(3,3)),
                    hexgrid.HexArray(np.empty((3,3), dtype=np.float64))]:
-            for n in xrange(9):
+            for n in range(9):
                 if n == 4:
                     self.assertSequenceEqual(
                         list(ha.neighbors(n)),
                         [0, 1, 5, 7, 6, 3]
-                    )
+                     )
                 else:
                     self.assertEqual(len(ha.neighbors(n)), 0)
 
@@ -97,7 +99,7 @@ class HexArrayRegionTester(unittest.TestCase):
         for pt in bd:
             hr.add_point(pt)
         ib = hr.interior_boundary()
-        print hr.members
+        print(hr.members)
         self.assertSetEqual(ib, bd)
 
     def test_convex(self):
