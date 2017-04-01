@@ -341,7 +341,8 @@ cdef class HexArrayRegion:
         cdef vector[int] boundary
         cdef vector[int].reverse_iterator it
         cdef int* nbr
-        cdef int n, initpt, startpt, prevpt, testpt
+        cdef int n, initpt, startpt, prevpt, testpt, nextpt, nextpt_line
+        cdef int orth_vert_pt0, orth_vert_pt1, nbr_count
         cdef bint looking = 1
         cdef bint already_in_boundary
         cdef size_t cnt = 0
@@ -355,69 +356,97 @@ cdef class HexArrayRegion:
                 break
         # now iterate through neighbors, looking for other boundary points
 
+        # index of the starting point...when we get back here we are done
         startpt = initpt
+        # index of the previous point...needed for walking line-like segments
         prevpt = initpt
         cnt = 0
-        while looking==1:
+        while True:
             # get the neighbors of the most recently added point
             looking = 0
             nbr = self.ha._neighbors(startpt)
             if nbr[0] == INT_NOT_FOUND:
-                # we are on a boundary, stop iterating
-                pass
-            else:
-                for n in range(6):
-                    testpt = nbr[n]
-                    #with gil:
-                    #  print('TESTPOINT: %g' % testpt)
-                    # check to see if neighbor point is also in the region
-                    if self.members.count(testpt)==1:
-                        # check to see if neighbor point is also on boundary
-                        if self._is_boundary(testpt):
-                            # check to see if neighbor point is the init pt
-                            if testpt == initpt:
-                                # the circle is closed and we are done
-                                pass
-                            else:
-                                # https://en.wikipedia.org/wiki/Curve_orientation
-                                # MAKE SURE WE ALWAYS GO EITHER CLOCKWISE OR
-                                # COUNTERCLOCKWISE!!!
-                                # this means always keeping the "interior" on
-                                # one side or the other...how do we guarantee
-                                # this?
+                # we are on a boundary, stop looking
+                break
+            # loop through each neighbor and check its proprties
+            nextpt = -1
+            nextpt_line = -1
+            # counter for how many neighbors are in the region
+            nbr_count = 0
+            for n in range(6):
+                # only consider points that are still in the region
+                testpt = nbr[n]
+                if self.members.count(testpt)==1:
+                    nbr_count += 1
+                    # if we are on a line, the orthogonal vertex approach will
+                    # fail, and we still need to figure out which direction to
+                    # go. On a line, there will be two neighbors in the
+                    # region: the previous point and the next point. We don't
+                    # want to add the previous point UNLESS we are at the end
+                    # of a line segment. In that case, we want to loop back and
+                    # traverse the line back to the initial point (initpt).
+                    if testpt != prevpt:
+                        nextpt_line = testpt
 
-                                # keep looking for the next point
-                                # check the past six points
-                                already_in_boundary = 0
-                                cnt_back = 0
-                                it = boundary.rbegin()
-                                while it != boundary.rend():
-                                    # only look at the past six points
-                                    # try looking at all the points
-                                    #if cnt_back > 5:
-                                    #    break
-                                    #with gil:
-                                    #   print("%g: %g ?= %g" % (cnt_back,
-                                    #                        testpt, deref(it)))
-                                    if (testpt == deref(it)):
-                                        already_in_boundary = 1
-                                        break
-                                    cnt_back += 1
-                                    inc(it)
-                                if not already_in_boundary:
-                                    # add the point
-                                    #with gil:
-                                    #    print 'from', startpt, 'adding', testpt
-                                    boundary.push_back(testpt)
-                                    # start from this point next time
-                                    startpt = testpt
-                                    looking = 1
-                                    # leave neigbor loop
-                                    break
+                    # the vertex under consideration is (startpt, testpt)
+                    # get the orthogonal vertex to this vertex
+                    # (orth_vert_pt0, orth_vert_pt1)
+                    if n==0:
+                        orth_vert_pt0 = nbr[5]
+                    else:
+                        orth_vert_pt0 = nbr[n-1]
+                    if n==5:
+                        orth_vert_pt1 = nbr[0]
+                    else:
+                        orth_vert_pt1 = nbr[n+1]
+                    # for positive orientation of the boundary, we want
+                    # orth_vert_pt1 OUTSIDE the region and orth_vert_pt2 INSIDE,
+                    # a vector pointing normal to the boundary following the
+                    # right-hand rule
+                    if ((self.members.count(orth_vert_pt0)==0) and
+                        (self.members.count(orth_vert_pt1)==1)):
+                        # we found the next point
+                        nextpt = testpt
+                        break
+
             free(nbr)
-            cnt += 1
+
+
+            # if we got here without finding a nextpt, it probably means we are
+            # on a line segnment...need special logic for that
+            if nextpt == -1:
+                if nbr_count == 1:
+                    # there is only one region neighbor, which means we are at
+                    # the end of a line segment. we turn around
+                    nextpt = prevpt
+                elif (nbr_count == 2) and (nextpt_line != -1):
+                    # we are traversing a line segment
+                    nextpt = nextpt_line
+                else:
+                    # we should never get here
+                    # something went wrong
+                    with gil:
+                        print("FAILED TO FIND NEXT POINT "
+                              "startpt=%g, nbr_count=%g, nextpt=%g, nextpt_line=%g"
+                              % (startpt, nbr_count, nextpt, nextpt_line))
+                    return boundary
+
+            #with gil:
+            #    print('from %g adding %g' % (startpt, nextpt))
+
+            #cnt += 1
             #if cnt>cntmax:
             #    break
+
+            # add the point to the boundary vector, only if it is NOT the
+            # the original point
+            if nextpt != initpt:
+                prevpt = startpt
+                startpt = nextpt
+                boundary.push_back(nextpt)
+            # otherwise we are done with the iteration
+            else:
+                break
         return boundary
 
     def area(self):
