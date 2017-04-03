@@ -409,19 +409,30 @@ cdef class HexArrayRegion:
                         nextpt = testpt
                         break
 
-            free(nbr)
 
 
             # if we got here without finding a nextpt, it probably means we are
             # on a line segnment...need special logic for that
             if nextpt == -1:
                 if nbr_count == 1:
-                    # there is only one region neighbor, which means we are at
-                    # the end of a line segment. we turn around
-                    nextpt = prevpt
+                    if cnt==0:
+                        # special case if this is the very first point
+                        # if we start at the end of a line, we just add the
+                        # nearest neighbor
+                        nextpt = nextpt_line
+                        with gil:
+                            print("Special case A, from %g adding nextpt %g" % (startpt, nextpt))
+                    else:
+                        # there is only one region neighbor, which means we are at
+                        # the end of a line segment. we turn around
+                        nextpt = prevpt
+                        with gil:
+                            print("Special case B, adding nextpt %g" % nextpt)
                 elif (nbr_count == 2) and (nextpt_line != -1):
                     # we are traversing a line segment
                     nextpt = nextpt_line
+                    with gil:
+                        print("Special case C, adding nextpt %g" % nextpt)
                 else:
                     # we should never get here
                     # something went wrong
@@ -431,10 +442,12 @@ cdef class HexArrayRegion:
                               % (startpt, nbr_count, nextpt, nextpt_line))
                     return boundary
 
+            free(nbr)
+
+
             #with gil:
             #    print('from %g adding %g' % (startpt, nextpt))
 
-            #cnt += 1
             #if cnt>cntmax:
             #    break
 
@@ -447,6 +460,9 @@ cdef class HexArrayRegion:
             # otherwise we are done with the iteration
             else:
                 break
+            cnt += 1
+            if cnt > 1000:
+                break
         return boundary
 
     def area(self):
@@ -454,28 +470,30 @@ cdef class HexArrayRegion:
 
     # http://www.mathopenref.com/coordpolygonarea2.html
     cdef DTYPE_flt_t _area(self) nogil:
-        cdef vector[int] ibo = self._interior_boundary_ordered()
         with gil:
-            print "got interior boundary ordered"
+            print("calculating area")
+        cdef vector[int] ibo = self._interior_boundary_ordered()
         cdef DTYPE_flt_t x0, y0, x1, y1
         cdef size_t nverts = ibo.size()
+        with gil:
+            print("    got %g verts" % nverts)
         # vertex loop counter
         cdef size_t i = 0
         # other vertex loop counter
         # The last vertex is the 'previous' one to the first
         cdef size_t j = nverts - 1
         # accumulates area in the loop
-        cdef DTYPE_flt_t area = 0.0;
+        cdef DTYPE_flt_t area = 0.0
         for i in range(nverts):
-            x0 = self.ha._xpos(i)
-            y0 = self.ha._ypos(i)
-            x1 = self.ha._xpos(j)
-            y1 = self.ha._ypos(j)
+            x0 = self.ha._xpos(ibo[i])
+            y0 = self.ha._ypos(ibo[i])
+            x1 = self.ha._xpos(ibo[j])
+            y1 = self.ha._ypos(ibo[j])
             area += (x1 + x0) * (y1 - y0)
+            #with gil:
+            #    print('x0, y0, x1, y1, area: %g, %g, %g, %g, %g' % (x0, y0, x1, y1, area))
             j = i
 
-        # minus needed because the interior boundary points are counterclockwise,
-        # not clockwise
         return -area/2.0
 
     def convex_hull_area(self):
@@ -579,7 +597,8 @@ cdef class HexArrayRegion:
         return sc
 
 
-def find_convex_regions(np.ndarray[DTYPE_flt_t, ndim=2] a, int minsize=0,
+def find_convex_regions(np.ndarray[DTYPE_flt_t, ndim=2] a,
+                        int minsize=0, int maxsize=0,
                         return_labeled_array=False,
                         target_convexity_deficiency=1e-3
                         ):
@@ -614,10 +633,10 @@ def find_convex_regions(np.ndarray[DTYPE_flt_t, ndim=2] a, int minsize=0,
     regions = []
     for nmax in maxima:
         hr = HexArrayRegion(ha, nmax)
-        cnt = 0
         diff_min = 0.0
         # set initial convexity deficiency to zero
         convex_def = 0.0
+        cnt = 0
         while convex_def <= target_convexity_deficiency:
             bndry = hr._exterior_boundary()
             first_pt = True
@@ -634,17 +653,25 @@ def find_convex_regions(np.ndarray[DTYPE_flt_t, ndim=2] a, int minsize=0,
             cnt += 1
 
             # calculate convexity
-            if cnt > 3:
-                print('region npoints %g' % len(hr.members))
+            if cnt >= minsize:
+                #print('region npoints %g' % len(hr.members))
                 region_area = hr._area()
-                print('region_area %e' % region_area)
+                #print('region_area %e' % region_area)
                 # only bother moving on if area is nonzero
                 if abs(region_area) > 1e-12:
-                    print('calculating convex hull')
+                    #print('calculating convex hull')
                     hull_area = hr._convex_hull_area()
-                    print('hull_area: %f' % hull_area)
+                    #print('hull_area: %f' % hull_area)
                     convex_def = (hull_area - region_area)/region_area
-                    print('convex_def: %f' % convex_def)
+                else:
+                    print("got zero region area, something must be wrong")
+                    #break
+
+            print('cnt=%g, convex_def: %f' % (cnt, convex_def))
+
+            if (maxsize > 0) and (cnt>maxsize):
+                print('exceeded count')
+                break
 
         # if we got here, we exceeded the convexity deficiency, so we need to
         # remove the last point
