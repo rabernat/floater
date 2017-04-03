@@ -54,7 +54,7 @@ class FloatSet(object):
 
         load_path : str
             The filename to load a saved floatset object from
-            (e.g.float.ini.pos.hex.bin)
+            (e.g. 'floatset.pkl')
         """
 
         if load_path is None:
@@ -256,7 +256,7 @@ class FloatSet(object):
         ----------
         filename : str
             The filename to save the floatset data in
-            (e.g. floatset_model_.pkl)
+            (e.g. 'floatset.pkl')
         """
         
         with open(filename, 'wb') as file:
@@ -269,7 +269,7 @@ class FloatSet(object):
         ----------
         filename : str
             The filename to load in the saved floatset data from
-            (e.g. floatset_model_.pkl)
+            (e.g. 'floatset.pkl')
         """
 
         with open(filename, 'rb') as file:
