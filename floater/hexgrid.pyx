@@ -14,7 +14,7 @@ from cython.parallel cimport prange, threadid
 from scipy.spatial import qhull
 #import matplotlib.path as mplPath
 
-from cython.operator cimport dereference as deref, preincrement as inc
+#from cython.operator cimport dereference as deref, preincrement as inc
 
 
 # integer indices
@@ -338,131 +338,138 @@ cdef class HexArrayRegion:
         return self._interior_boundary_ordered()
 
     cdef vector[int] _interior_boundary_ordered(self) nogil:
+        """Find the ordered interior boundary of a simply-connected
+        hexarray region.
+
+        Returns an *empty vector* if any line segments are found in the region.
+        Some reasons why:
+            - Line segments are not locally orientable (although they may be
+              globally orientable)
+            - Line segments attached to regions cause the iteration to go
+              into an infinite look because it never gets back onto the line.
+              (This could probably be fixed with some more complex logic), but...
+            - We will never want to keep such regions
+        """
         cdef vector[int] boundary
-        cdef vector[int].reverse_iterator it
+        cdef vector[int] failure
         cdef int* nbr
-        cdef int n, initpt, startpt, prevpt, testpt, nextpt, nextpt_line
-        cdef int orth_vert_pt0, orth_vert_pt1, nbr_count
-        cdef bint looking = 1
+        cdef int n, initpt, startpt, prevpt, testpt, nextpt, nextpt_line, n_start
+        cdef int orth_vert_left, orth_vert_right, nbr_count
+        cdef int inc, n_idx, is_inside_left, is_inside_right
         cdef bint already_in_boundary
         cdef size_t cnt = 0
         cdef size_t cntmax = 100
         cdef size_t cnt_back
+        # +1: positive orientation (right hand rule: counterclockwise path around center)
+        # -1: negative orientation (clockwise path around center)
+        # 0: not determined yet
+        cdef int orientation = 0
         # first just find any point on the boundary
         for n in self.members:
             if self._is_boundary(n):
                 boundary.push_back(n)
                 initpt = n
+                startpt = n
                 break
-        # now iterate through neighbors, looking for other boundary points
 
-        # index of the starting point...when we get back here we are done
-        startpt = initpt
-        # index of the previous point...needed for walking line-like segments
-        prevpt = initpt
-        cnt = 0
-        while True:
-            # get the neighbors of the most recently added point
-            looking = 0
-            nbr = self.ha._neighbors(startpt)
-            if nbr[0] == INT_NOT_FOUND:
-                # we are on a boundary, stop looking
-                break
-            # loop through each neighbor and check its proprties
-            nextpt = -1
-            nextpt_line = -1
-            # counter for how many neighbors are in the region
-            nbr_count = 0
+        # now get another point to form a vertex
+        nextpt = -1
+        nbr = self.ha._neighbors(initpt)
+        if nbr[0] != INT_NOT_FOUND:
             for n in range(6):
-                # only consider points that are still in the region
                 testpt = nbr[n]
+                # only consider points that are still in the region...
                 if self.members.count(testpt)==1:
-                    nbr_count += 1
-                    # if we are on a line, the orthogonal vertex approach will
-                    # fail, and we still need to figure out which direction to
-                    # go. On a line, there will be two neighbors in the
-                    # region: the previous point and the next point. We don't
-                    # want to add the previous point UNLESS we are at the end
-                    # of a line segment. In that case, we want to loop back and
-                    # traverse the line back to the initial point (initpt).
-                    if testpt != prevpt:
-                        nextpt_line = testpt
-
-                    # the vertex under consideration is (startpt, testpt)
-                    # get the orthogonal vertex to this vertex
-                    # (orth_vert_pt0, orth_vert_pt1)
-                    if n==0:
-                        orth_vert_pt0 = nbr[5]
-                    else:
-                        orth_vert_pt0 = nbr[n-1]
-                    if n==5:
-                        orth_vert_pt1 = nbr[0]
-                    else:
-                        orth_vert_pt1 = nbr[n+1]
-                    # for positive orientation of the boundary, we want
-                    # orth_vert_pt1 OUTSIDE the region and orth_vert_pt2 INSIDE,
-                    # a vector pointing normal to the boundary following the
-                    # right-hand rule
-                    if ((self.members.count(orth_vert_pt0)==0) and
-                        (self.members.count(orth_vert_pt1)==1)):
-                        # we found the next point
+                    # ...and on the boundary
+                    if self._is_boundary(testpt):
                         nextpt = testpt
                         break
 
 
+        # now we have a vertex (startpt -> nextpt) on the boundary
+        # but we don't know its orientation
 
-            # if we got here without finding a nextpt, it probably means we are
-            # on a line segnment...need special logic for that
-            if nextpt == -1:
-                if nbr_count == 1:
-                    if cnt==0:
-                        # special case if this is the very first point
-                        # if we start at the end of a line, we just add the
-                        # nearest neighbor
-                        nextpt = nextpt_line
-                        with gil:
-                            print("Special case A, from %g adding nextpt %g" % (startpt, nextpt))
-                    else:
-                        # there is only one region neighbor, which means we are at
-                        # the end of a line segment. we turn around
-                        nextpt = prevpt
-                        with gil:
-                            print("Special case B, adding nextpt %g" % nextpt)
-                elif (nbr_count == 2) and (nextpt_line != -1):
-                    # we are traversing a line segment
-                    nextpt = nextpt_line
-                    with gil:
-                        print("Special case C, adding nextpt %g" % nextpt)
-                else:
-                    # we should never get here
-                    # something went wrong
-                    with gil:
-                        print("FAILED TO FIND NEXT POINT "
-                              "startpt=%g, nbr_count=%g, nextpt=%g, nextpt_line=%g"
-                              % (startpt, nbr_count, nextpt, nextpt_line))
-                    return boundary
+        # index mapping from one point to the next
 
+        #
+        # FORWARD NEIGHBOR INDICES
+        #
+        #     4     3
+        #
+        #  5     p     2
+        #
+        #     0     1
+        #
+        #
+        # BACKWARD NEIGHBOR INDICES
+        #
+        #     1     0
+        #
+        #  2     p     5
+        #
+        #     3     4
+        #
+
+        cnt = 0
+        while nextpt != initpt:
+            # shift everything forward
+            boundary.push_back(nextpt)
+            prevpt = startpt
+            startpt = nextpt
+            nextpt = -1
+
+            if orientation == 0:
+                # try to figure out the orientation by looking at the
+                # orthogonal vertex to the previous vertex
+                # nbr and n should still be set from the previous loop
+                orth_vert_left = nbr[(n+1) % 6]
+                orth_vert_right = nbr[(n-1) % 6]
+                # for positive orientation of the boundary, we want
+                # orth_vert_right OUTSIDE the region and orth_vert_left INSIDE,
+                # a vector pointing normal to the boundary following the
+                # right-hand rule
+                is_inside_left = self.members.count(orth_vert_left)==1
+                is_inside_right = self.members.count(orth_vert_right)==1
+                orientation = is_inside_left - is_inside_right
+                with gil:
+                    print('(%g, %g, %g): left(%g, %g)=%g, right(%g, %g)=%g -> ori %g' % (
+                      prevpt, startpt, n,
+                      orth_vert_left, (n+1) % 6, is_inside_left,
+                      orth_vert_right, (n-1) % 6, is_inside_right, orientation))
+
+            # now we can walk to the next point
             free(nbr)
-
-
-            #with gil:
-            #    print('from %g adding %g' % (startpt, nextpt))
-
-            #if cnt>cntmax:
-            #    break
-
-            # add the point to the boundary vector, only if it is NOT the
-            # the original point
-            if nextpt != initpt:
-                prevpt = startpt
-                startpt = nextpt
-                boundary.push_back(nextpt)
-            # otherwise we are done with the iteration
-            else:
+            nbr = self.ha._neighbors(startpt)
+            if nbr[0] == INT_NOT_FOUND:
+                # on a boundary
+                nextpt = initpt
                 break
+
+            # figure out where the previous link is coming from
+            n_start = (n + 3) % 6
+
+            # the search direction (angular)
+            if orientation < 0:
+                inc = -1
+            else:
+                # if orientation is 0, doesn't matter what direction we search
+                inc = 1
+
+            # check the neighbor points in the proper order
+            for n_idx in range(1, 7):
+                # index of the neighbor point to check
+                n = (n_start + inc*n_idx) % 6
+                testpt = nbr[n]
+                if self.members.count(testpt)==1:
+                    # found our next point
+                    nextpt = testpt
+                    break
+
             cnt += 1
             if cnt > 1000:
                 break
+
+        free(nbr)
         return boundary
 
     def area(self):
@@ -470,13 +477,9 @@ cdef class HexArrayRegion:
 
     # http://www.mathopenref.com/coordpolygonarea2.html
     cdef DTYPE_flt_t _area(self) nogil:
-        with gil:
-            print("calculating area")
         cdef vector[int] ibo = self._interior_boundary_ordered()
         cdef DTYPE_flt_t x0, y0, x1, y1
         cdef size_t nverts = ibo.size()
-        with gil:
-            print("    got %g verts" % nverts)
         # vertex loop counter
         cdef size_t i = 0
         # other vertex loop counter
@@ -494,7 +497,11 @@ cdef class HexArrayRegion:
             #    print('x0, y0, x1, y1, area: %g, %g, %g, %g, %g' % (x0, y0, x1, y1, area))
             j = i
 
-        return -area/2.0
+        # we don't know the area, so we need to normalize
+        if area < 0:
+            return -area/2.0
+        else:
+            return area/2.0
 
     def convex_hull_area(self):
         return self._convex_hull_area()
@@ -636,6 +643,7 @@ def find_convex_regions(np.ndarray[DTYPE_flt_t, ndim=2] a,
         diff_min = 0.0
         # set initial convexity deficiency to zero
         convex_def = 0.0
+        region_area = 0.0
         cnt = 0
         while convex_def <= target_convexity_deficiency:
             bndry = hr._exterior_boundary()
@@ -658,19 +666,19 @@ def find_convex_regions(np.ndarray[DTYPE_flt_t, ndim=2] a,
                 region_area = hr._area()
                 #print('region_area %e' % region_area)
                 # only bother moving on if area is nonzero
-                if abs(region_area) > 1e-12:
+                if abs(region_area) > 0.0:
                     #print('calculating convex hull')
                     hull_area = hr._convex_hull_area()
                     #print('hull_area: %f' % hull_area)
                     convex_def = (hull_area - region_area)/region_area
                 else:
-                    print("got zero region area, something must be wrong")
-                    #break
+                    #print("got zero region area, something must be wrong")
+                    break
 
             print('cnt=%g, convex_def: %f' % (cnt, convex_def))
 
             if (maxsize > 0) and (cnt>maxsize):
-                print('exceeded count')
+                #print('exceeded count')
                 break
 
         # if we got here, we exceeded the convexity deficiency, so we need to
