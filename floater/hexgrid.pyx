@@ -394,8 +394,8 @@ cdef class HexArrayRegion:
         cdef vector[int] failure
         cdef int* nbr
         cdef int n, initpt, startpt, prevpt, testpt, nextpt, nextpt_line, n_start
-        cdef int orth_vert_left, orth_vert_right
-        cdef int nbr_count = 0
+        cdef size_t nbr_count, line_neighbor_count, origin_visit_count
+        cdef int orth_vert_left, orth_vert_right, nvertex
         cdef int inc, n_idx, is_inside_left, is_inside_right
         cdef bint already_in_boundary
         cdef size_t cnt = 0
@@ -416,6 +416,9 @@ cdef class HexArrayRegion:
 
         # now get another point to form a vertex
         nextpt = -1
+        nvertex = -1
+        line_neighbor_count = 0
+        nbr_count = 0
         nbr = self.ha._neighbors(startpt)
         if nbr[0] != INT_NOT_FOUND:
             for n in range(6):
@@ -423,19 +426,34 @@ cdef class HexArrayRegion:
                 # only consider points that are still in the region...
                 if self.members.count(testpt)==1:
                     # ...and on the boundary
+                    nbr_count += 1
                     if self._is_boundary(testpt):
                         nextpt = testpt
                         # we can stop searching if we got an orientation
                         orientation = self._vertex_orientation(startpt, n)
                         if orientation != 0:
-                            #with gil:
-                            #    print('Got initial orientation %g' % orientation)
-                            break
+                            nvertex = n
+                        else:
+                            # a neigbhor point with no orientation is a line
+                            line_neighbor_count += 1
+
+        # override nextpt if we got an orientation
+        if nvertex != -1:
+            nextpt = nbr[nvertex]
+            n = nvertex
         free(nbr)
 
+        if nextpt == -1:
+            return failure
 
-        # now we have a vertex (startpt -> nextpt) on the boundary
-        # but we don't know its orientation
+        #with gil:
+        #    print "line_neigbor_count: %g" % line_neighbor_count
+
+        if (nbr_count > 1) and (line_neighbor_count > 0):
+            # we need to revisit the origin twice!
+            origin_visit_count = 2
+        else:
+            origin_visit_count = 1
 
         # index mapping from one point to the next
 
@@ -457,9 +475,23 @@ cdef class HexArrayRegion:
         #
         #     3     4
         #
+        # Examples of weird connectivity
+        #
+        #     x     x             x     o             x     o
+        #
+        #  o     p     o      o      p     x      o      p      o
+        #
+        #     x     x             x     o             x    x
+        #
+        # What do these have in common? at least two gaps between
+        #
+        # here is one idea: if the starting point has any line-like neighbors,
+        # we know we need to visit it *twice* before we are done
+
 
         cnt = 0
-        while nextpt != initpt:
+        #while nextpt != initpt:
+        while origin_visit_count > 0:
             # shift everything forward
             boundary.push_back(nextpt)
             prevpt = startpt
@@ -499,7 +531,6 @@ cdef class HexArrayRegion:
                 # on a boundary
                 # nextpt = initpt
                 return failure
-                break
 
             # figure out where the previous link is coming from
             n_start = (n + 3) % 6
@@ -525,7 +556,23 @@ cdef class HexArrayRegion:
             if cnt > MAX_ITERS:
                 break
 
-        free(nbr)
+            free(nbr)
+
+            # we are about to visit the origin:
+            if nextpt == initpt:
+                # decrement origin visit counter
+                origin_visit_count -= 1
+
+        # make sure we actually got all the points
+        # for certain pathalogical regions, we won't actually detect all the
+        # boundary points
+        # potentiall expensive call to _interior_boundary
+        # check that each point in the interior boundary is also in the
+        # ordered interior boundary
+        #if boundary.size() < self._interior_boundary().size():
+        #    return boundary
+        #else:
+        #    return failure
         return boundary
 
     def area(self):
