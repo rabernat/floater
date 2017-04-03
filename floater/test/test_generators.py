@@ -164,6 +164,15 @@ def test_area(fs_all):
 def test_to_mitgcm_format(fs_all, tmpdir):
     _actually_do_mitgcm_check(fs_all, tmpdir)
 
+def test_pickling(fs, tmpdir):
+    filename = str(tmpdir.join('pickled_floatset.pkl'))
+    fs.to_pickle(filename)
+    fs_from_pickle = gen.FloatSet(load_path=filename)
+
+    for key in fs.__dict__.keys():
+        assert np.all(fs.__dict__[key] == fs_from_pickle.__dict__[key])
+
+
 
 # Nathaniel's example
 # https://github.com/rabernat/floater/issues/20
