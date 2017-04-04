@@ -56,4 +56,5 @@ elif args.output_format=='pandas':
 			            progress=args.progress,
                         keep_fields=keep_fields)
 elif args.output_format=='netcdf':
-    utils.floats_to_netcdf()
+    utils.floats_to_netcdf(args.input_dir, args.output_file,
+                        float_file_prefix=args.float_file_prefix)

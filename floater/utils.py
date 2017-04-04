@@ -219,10 +219,53 @@ def floats_to_castra(input_dir, output_fname, progress=False, **kwargs):
             c = Castra(output_fname, template=df)
         c.extend(df)
 
-def floats_to_netcdf(output_fname):
+def floats_to_netcdf(input_dir, output_dir, float_file_prefix):
     """Convert MITgcm float data to NetCDF format.
 
     Parameters
     ----------
+    input_dir : path
+        Where to find the MITgcm output data
+    output_dir : path
     """
-    output_fname = _maybe_add_suffix(output_fname, '.nc')
+    import dask.dataframe as dd
+    import xarray as xr
+
+    float_digits = 10
+    float_columns = ['npart', 'time', 'x', 'y', 'z', 'u', 'v', 'vort']
+    float_dtypes = np.dtype([('npart', np.int32), ('time', np.float32), ('x', np.float32), ('y', np.float32), ('z', np.float32), ('u', np.float32), ('v', np.float32), ('vort', np.float32)])
+
+    reference_time = np.datetime64('1993-01-01', 'ns')
+    timestep = 86400.
+
+    float_list = []
+    for file in os.listdir(input_dir):
+        if file.startswith(float_file_prefix) and file.endswith('.csv'):
+            float_list.append(file[:len(float_file_prefix)+float_digits+1])
+            float_list = sorted(list(set(float_list)))
+
+    for float_file in float_list:
+        df = dd.read_csv(urlpath=input_dir+float_file+'.*.csv',
+                         names=float_columns, dtype=float_dtypes, header=None)
+        dfc = df.compute()
+        dfcs = dfc.sort('npart')
+        timestep_count = int(dfcs.time.values[0]/timestep)
+        days = np.timedelta64(timestep_count, 'D')
+        time = np.array([reference_time+days])
+        npart = dfcs.npart.values
+        x = dfcs.x.values.reshape((1, len(npart)))
+        y = dfcs.y.values.reshape((1, len(npart)))
+        z = dfcs.x.values.reshape((1, len(npart)))
+        u = dfcs.u.values.reshape((1, len(npart)))
+        v = dfcs.v.values.reshape((1, len(npart)))
+        vort = dfcs.vort.values.reshape((1, len(npart)))
+        ds = xr.Dataset(data_vars={'x': (['time', 'npart'], x),
+                                   'y': (['time', 'npart'], y),
+                                   'z': (['time', 'npart'], z),
+                                   'u': (['time', 'npart'], u),
+                                   'v': (['time', 'npart'], v),
+                                   'vort': (['time', 'npart'], vort)},
+                        coords={'time': time,
+                                'npart': npart})
+        output_dir = input_dir+float_file+'.nc'
+        ds.to_netcdf(output_dir)
