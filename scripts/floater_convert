@@ -18,10 +18,10 @@ parser.set_defaults(progress=False)
 parser.add_argument('--input_dir', default='./', metavar='DIR',
                    help='directory in which to find the MITgcm float data')
 
-parser.add_argument('--output_format', choices=['pytables','bcolz','pandas'],
+parser.add_argument('--output_format', choices=['pytables','bcolz','pandas','netcdf'],
                     default='pytables', metavar='FMT',
                     help="output format of conversion "
-                         "('pytables', 'bcolz', or 'pandas')")
+                         "('pytables', 'bcolz', 'pandas', or 'netcdf')")
 
 parser.add_argument('--keep_fields', type=str,
                     default=None, metavar='FIELDS',
