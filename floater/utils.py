@@ -219,7 +219,7 @@ def floats_to_castra(input_dir, output_fname, progress=False, **kwargs):
             c = Castra(output_fname, template=df)
         c.extend(df)
 
-def floats_to_netcdf(input_dir, output_dir, float_file_prefix):
+def floats_to_netcdf(input_dir, output_fname, float_file_prefix):
     """Convert MITgcm float data to NetCDF format.
 
     Parameters
@@ -227,6 +227,9 @@ def floats_to_netcdf(input_dir, output_dir, float_file_prefix):
     input_dir : path
         Where to find the MITgcm output data
     output_dir : path
+        Filename of the NetCDF data store
+    float_file_prefix: str
+        Prefix of MITgcm output files
     """
     import dask.dataframe as dd
     import xarray as xr
@@ -267,5 +270,5 @@ def floats_to_netcdf(input_dir, output_dir, float_file_prefix):
                                    'vort': (['time', 'npart'], vort)},
                         coords={'time': time,
                                 'npart': npart})
-        output_dir = input_dir+float_file+'.nc'
+        output_dir = input_dir + output_fname + '/' + float_file + '.nc'
         ds.to_netcdf(output_dir)
