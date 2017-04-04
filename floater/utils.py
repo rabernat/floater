@@ -226,7 +226,7 @@ def floats_to_netcdf(input_dir, output_fname, float_file_prefix):
     ----------
     input_dir : path
         Where to find the MITgcm output data
-    output_dir : path
+    output_fname : path
         Filename of the NetCDF data store
     float_file_prefix: str
         Prefix of MITgcm output files
