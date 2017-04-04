@@ -36,7 +36,7 @@ if args.keep_fields is not None:
     keep_fields = [str(item) for item in args.keep_fields.split(',')]
 else:
     keep_fields = None
-    
+
 if args.output_format=='pytables':
     utils.floats_to_tables(args.input_dir, args.output_file,
                         float_file_prefix=args.float_file_prefix,
@@ -55,3 +55,5 @@ elif args.output_format=='pandas':
                         buf_dim=args.float_buf_dim,
 			            progress=args.progress,
                         keep_fields=keep_fields)
+elif args.output_format=='netcdf':
+    utils.floats_to_netcdf()
