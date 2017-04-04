@@ -8,6 +8,7 @@ Transcode [MITgcm float output](http://mitgcm.org/) into:
 * [PyTables](https://pytables.github.io/) HDF5 format
 * [pandas](http://pandas.pydata.org/) HDF5 format
 * [bcolz](http://bcolz.blosc.org/)
+* [NetCDF](https://www.unidata.ucar.edu/software/netcdf/)
 
 Transcoding is done via the `floater_convert` script, which is installed with the package.
 
@@ -20,5 +21,3 @@ usage: floater_convert [-h] [--float_file_prefix PREFIX] [--float_buf_dim N]
 ```
 
 Also generators and analysis tools for Lagrangian trajectories.
-
-
