@@ -12,7 +12,8 @@ class MITgcmFloatData(object):
 
     def __init__(self, data_path, file_prefix='float_trajectories',
                  buf_dim=14, file_dtype=np.dtype('>f4'),
-                 cast_to_dtype=np.dtype('f4'), keep_fields=None):
+                 cast_to_dtype=np.dtype('f4'), keep_fields=None,
+                 file_suffix='data'):
         """Initialize object with information about the location and datatype of
         the floats.
 
@@ -35,6 +36,7 @@ class MITgcmFloatData(object):
         self._file_prefix = file_prefix
         self._buf_dim = buf_dim
         self._dtype = file_dtype
+        self._file_suffix = file_suffix
 
         # map buffer lengths to knowledge about MITgcm float output format
         assert self._buf_dim in [8, 13, 14]
@@ -47,7 +49,7 @@ class MITgcmFloatData(object):
 
         # examine input files
         self.files = glob.glob(os.path.join(
-                        self._data_path, self._file_prefix + '*.data'))
+                        self._data_path, self._file_prefix + '*.' + self._file_suffix))
         if len(self.files)==0:
             raise RuntimeError('No float files found in %s' % float_dir)
         # calculate total number of float records in dataset

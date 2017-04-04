@@ -219,9 +219,10 @@ def floats_to_castra(input_dir, output_fname, progress=False, **kwargs):
             c = Castra(output_fname, template=df)
         c.extend(df)
 
-def floats_to_netcdf():
+def floats_to_netcdf(output_fname):
     """Convert MITgcm float data to NetCDF format.
 
     Parameters
     ----------
     """
+    output_fname = _maybe_add_suffix(output_fname, '.nc')
