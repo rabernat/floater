@@ -71,3 +71,7 @@ def test_floats_to_bcolz(tmpdir, mitgcm_float_datadir):
     # now make sure the values are in the correct range
     for name, val in zip(_NAMES, _TESTVALS_FIRST):
         np.testing.assert_almost_equal(bc[0][name], val)
+
+def test_floats_to_netcdf():
+    """Test that we can convert MITgcm float data into NetCDF format
+    """
