@@ -27,6 +27,12 @@ parser.add_argument('--keep_fields', type=str,
                     default=None, metavar='FIELDS',
                     help="comma-dilimited list of data fields to retain")
 
+parser.add_argument('--ref_time', default=None,
+                    help='reference time')
+
+parser.add_argument('--step_time', default=86400,
+                    help='step time')
+
 parser.add_argument('output_file',
                    help='the output filename')
 
@@ -57,4 +63,6 @@ elif args.output_format=='pandas':
                         keep_fields=keep_fields)
 elif args.output_format=='netcdf':
     utils.floats_to_netcdf(args.input_dir, args.output_file,
-                        float_file_prefix=args.float_file_prefix)
+                        float_file_prefix=args.float_file_prefix,
+                        ref_time=args.ref_time,
+                        step_time=args.step_time)
