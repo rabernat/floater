@@ -236,23 +236,21 @@ def floats_to_netcdf(input_dir, output_fname, float_file_prefix,
     step_time: int
         Step time
     """
+    from glob import glob
     import dask.dataframe as dd
     import xarray as xr
 
     float_digits = 10
     float_columns = ['npart', 'time', 'x', 'y', 'z', 'u', 'v', 'vort']
     float_dtypes = np.dtype([('npart', np.int32), ('time', np.float32), ('x', np.float32), ('y', np.float32), ('z', np.float32), ('u', np.float32), ('v', np.float32), ('vort', np.float32)])
-    float_files = []
 
-    for file in os.listdir(input_dir):
-        if file.startswith(float_file_prefix) and file.endswith('.csv'):
-            float_files.append(file[:len(float_file_prefix)+float_digits+1])
-            float_files = sorted(list(set(float_files)))
+    float_files = glob(float_file_prefix+'*.csv')
+    float_timesteps = {float_file[:len(float_file_prefix)+float_digits+1] for float_file in float_files}
 
     var_names = ['x', 'y', 'z', 'u', 'v', 'vort']
 
-    for float_file in float_files:
-        input_path = input_dir + float_file + '.*.csv'
+    for float_timestep in float_timesteps:
+        input_path = input_dir + float_timestep + '.*.csv'
         df = dd.read_csv(input_path, names=float_columns, dtype=float_dtypes, header=None)
         dfc = df.compute()
         dfcs = dfc.sort('npart')
@@ -267,5 +265,5 @@ def floats_to_netcdf(input_dir, output_fname, float_file_prefix,
         var_shape = (1, len(npart))
         data_vars = {var_name: (['time', 'npart'], dfc[var_name].values.reshape(var_shape)) for var_name in var_names}
         ds = xr.Dataset(data_vars, coords={'time': time, 'npart': npart})
-        output_path = input_dir + output_fname + '/' + float_file + '.nc'
+        output_path = input_dir + output_fname + '/' + float_timestep + '.nc'
         ds.to_netcdf(output_path)
