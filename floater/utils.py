@@ -244,7 +244,7 @@ def floats_to_netcdf(input_dir, output_fname, float_file_prefix,
     float_columns = ['npart', 'time', 'x', 'y', 'z', 'u', 'v', 'vort']
     float_dtypes = np.dtype([('npart', np.int32), ('time', np.float32), ('x', np.float32), ('y', np.float32), ('z', np.float32), ('u', np.float32), ('v', np.float32), ('vort', np.float32)])
 
-    float_files = glob(float_file_prefix+'*.csv')
+    float_files = glob(float_file_prefix+'.*.csv')
     float_timesteps = {float_file[:len(float_file_prefix)+float_digits+1] for float_file in float_files}
 
     var_names = ['x', 'y', 'z', 'u', 'v', 'vort']
