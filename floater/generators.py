@@ -3,6 +3,7 @@
 from __future__ import print_function
 
 import numpy as np
+import pickle
 from scipy.spatial import cKDTree
 
 
@@ -29,7 +30,7 @@ def xyz_to_geo(xyz_coord):
 class FloatSet(object):
     """Represents a set of initial float positions on a regular grid."""
 
-    def __init__(self, xlim, ylim, dx=1., dy=1., model_grid=None):
+    def __init__(self, xlim=None, ylim=None, dx=1., dy=1., model_grid=None, load_path=None):
         """Initialize FloatSet according to specified rectangular grid geometry.
 
         PARAMETERS
@@ -50,26 +51,32 @@ class FloatSet(object):
                 is unmasked (ocean)
             'lon': 1d array of the mask grid longitudes
             'lat': 1d array of the mask grid latitudes
+
+        load_path : str
+            The filename to load a saved floatset object from
+            (e.g. 'floatset.pkl')
         """
 
-        if not len(xlim)==2 and len(ylim)==2:
-            raise ValueError('xlim and ylim should both by length 2.')
-        self.xlim = [float(x) for x in xlim]
-        self.ylim = [float(y) for y in ylim]
-        self.Lx = xlim[1] - xlim[0]
-        self.Ly = ylim[1] - ylim[0]
-        if not (float(self.Lx)/float(dx)).is_integer():
-            raise ValueError("Lx is not divisible evenly by dx")
-        if not (float(self.Ly)/float(dy)).is_integer():
-            raise ValueError("Ly is not divisible evenly by dy")
-        self.dx = float(dx)
-        self.dy = float(dy)
-        self.Nx = int(self.Lx / self.dx)
-        self.Ny = int(self.Ly / self.dy)
-        self.x = self.xlim[0] + self.dx * np.arange(self.Nx) + self.dx/2
-        self.y = self.ylim[0] + self.dy * np.arange(self.Ny) + self.dy/2
-        self.model_grid = model_grid
-
+        if load_path is None:
+            if not len(xlim)==2 and len(ylim)==2:
+                raise ValueError('xlim and ylim should both be length 2.')
+            self.xlim = [float(x) for x in xlim]
+            self.ylim = [float(y) for y in ylim]
+            self.Lx = xlim[1] - xlim[0]
+            self.Ly = ylim[1] - ylim[0]
+            if not (float(self.Lx)/float(dx)).is_integer():
+                raise ValueError("Lx is not divisible evenly by dx")
+            if not (float(self.Ly)/float(dy)).is_integer():
+                raise ValueError("Ly is not divisible evenly by dy")
+            self.dx = float(dx)
+            self.dy = float(dy)
+            self.Nx = int(self.Lx / self.dx)
+            self.Ny = int(self.Ly / self.dy)
+            self.x = self.xlim[0] + self.dx * np.arange(self.Nx) + self.dx/2
+            self.y = self.ylim[0] + self.dy * np.arange(self.Ny) + self.dy/2
+            self.model_grid = model_grid
+        else:
+            self.from_pickle(load_path)
 
 
 
@@ -242,6 +249,33 @@ class FloatSet(object):
         #fname = os.path.join(output_dir, output_fname)
         return flt_matrix.tofile(filename)
 
+    def to_pickle(self, filename='./floatset.pkl'):
+        """Write out floatset data in pickled format
+
+        PARAMETERS
+        ----------
+        filename : str
+            The filename to save the floatset data in
+            (e.g. 'floatset.pkl')
+        """
+        
+        with open(filename, 'wb') as file:
+            pickle.dump(self, file, -1)
+
+    def from_pickle(self, filename='./floatset.pkl'):
+        """Sets attributes equal to saved FloatSet object in pickled format
+
+        PARAMETERS
+        ----------
+        filename : str
+            The filename to load in the saved floatset data from
+            (e.g. 'floatset.pkl')
+        """
+
+        with open(filename, 'rb') as file:
+            self.__dict__.update(pickle.load(file).__dict__)
+
+
 
 def _subset_floats_from_mask(xx, yy, model_grid):
     """Eliminate float positions that are on land land mask.
@@ -293,3 +327,5 @@ def _subset_floats_from_mask(xx, yy, model_grid):
     floats_ocean = floats_geo[np.nonzero(ocean_bools.astype('int'))].T
 
     return floats_ocean
+
+
