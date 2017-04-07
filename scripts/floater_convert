@@ -31,7 +31,7 @@ parser.add_argument('--ref_time', default=None, metavar='RT',
                     help='reference time, format: YYYY-MM-DD')
 
 parser.add_argument('--step_time', default=86400, metavar='ST',
-                    help='step time, unit: seconds')
+                    help='step time, unit: second')
 
 parser.add_argument('output_file',
                    help='the output filename')
