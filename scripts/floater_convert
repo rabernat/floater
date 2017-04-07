@@ -27,11 +27,11 @@ parser.add_argument('--keep_fields', type=str,
                     default=None, metavar='FIELDS',
                     help="comma-dilimited list of data fields to retain")
 
-parser.add_argument('--ref_time', default=None,
-                    help='reference time')
+parser.add_argument('--ref_time', default=None, metavar='RT',
+                    help='reference time, format: YYYY-MM-DD')
 
-parser.add_argument('--step_time', default=86400,
-                    help='step time')
+parser.add_argument('--step_time', default=86400, metavar='ST',
+                    help='step time, unit: seconds')
 
 parser.add_argument('output_file',
                    help='the output filename')

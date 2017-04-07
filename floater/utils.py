@@ -232,22 +232,25 @@ def floats_to_netcdf(input_dir, output_fname, float_file_prefix,
     float_file_prefix: str
         Prefix of MITgcm output files
     ref_time: str
-        Reference time
+        Reference time, format: YYYY-MM-DD
     step_time: int
-        Step time
+        Step time, unit: second
     """
-    from glob import glob
     import dask.dataframe as dd
     import xarray as xr
-
-    float_digits = 10
-    float_columns = ['npart', 'time', 'x', 'y', 'z', 'u', 'v', 'vort']
-    float_dtypes = np.dtype([('npart', np.int32), ('time', np.float32), ('x', np.float32), ('y', np.float32), ('z', np.float32), ('u', np.float32), ('v', np.float32), ('vort', np.float32)])
+    from glob import glob
 
     float_files = glob(float_file_prefix+'.*.csv')
-    float_timesteps = {float_file[:len(float_file_prefix)+float_digits+1] for float_file in float_files}
+    float_digits = 10
+    step_code = len(float_file_prefix) + float_digits + 1
+    float_timesteps = {float_file[:step_code] for float_file in float_files}
 
-    var_names = ['x', 'y', 'z', 'u', 'v', 'vort']
+    float_columns = ['npart', 'time', 'x', 'y', 'z', 'u', 'v', 'vort']
+    var_names = float_columns[2:]
+
+    var_int = [('npart', np.int32)]
+    var_float = [(var, np.float32) for var in float_columns[1:]]
+    float_dtypes = np.dtype(var_int+var_float)
 
     for float_timestep in float_timesteps:
         input_path = input_dir + float_timestep + '.*.csv'
