@@ -243,7 +243,7 @@ def floats_to_netcdf(input_dir, output_fname, float_file_prefix,
     float_files = glob(float_file_prefix+'.*.csv')
     float_digits = 10
     step_code = len(float_file_prefix) + float_digits + 1
-    float_timesteps = {float_file[:step_code] for float_file in float_files}
+    float_timesteps = sorted(list({float_file[:step_code] for float_file in float_files}))
 
     float_columns = ['npart', 'time', 'x', 'y', 'z', 'u', 'v', 'vort']
     var_names = float_columns[2:]
@@ -263,10 +263,10 @@ def floats_to_netcdf(input_dir, output_fname, float_file_prefix,
             del_time = np.timedelta64(step_time*step_num, 's')
             time = np.array([ref_time+del_time])
         else:
-            time = np.array([step_num])
+            time = np.array([np.int32(step_num)])
         npart = dfcs.npart.values
         var_shape = (1, len(npart))
-        data_vars = {var_name: (['time', 'npart'], dfc[var_name].values.reshape(var_shape)) for var_name in var_names}
+        data_vars = {var_name: (['time', 'npart'], dfcs[var_name].values.reshape(var_shape)) for var_name in var_names}
         ds = xr.Dataset(data_vars, coords={'time': time, 'npart': npart})
         output_path = input_dir + output_fname + '/' + float_timestep + '.nc'
         ds.to_netcdf(output_path)
