@@ -19,6 +19,7 @@ _TESTVALS_FIRST = (1127925.0, 6134400.0, 247.69285583496094, -63.59305191040039,
 _TESTDATA_FILENAME_CSV = 'sample_mitgcm_float_trajectories_csv.tar.gz'
 _TMPDIR_SUBDIR_CSV = 'sample_mitgcm_data_csv'
 
+
 #@pytest.fixture()
 #def empty_output_dir(tmpdir):
 #    return tmpdir.mkdir('test')
@@ -98,3 +99,15 @@ def test_floats_to_netcdf(mitgcm_float_datadir_csv):
                            float_file_prefix='float_trajectories',
                            ref_time=None)
     mfd = xr.open_mfdataset('test.nc/*.nc')
+
+    # dimensions
+    dims = {'npart': 40, 'time': 2}
+    assert mfd.dims == dims
+
+    # variables and values
+    vars_values = [('x',  0.3237109375000000e+03), ('y',   -0.7798437500000000e+02),
+                   ('z', -0.4999999999999893e+00), ('u',   -0.5346306607990328e-02),
+                   ('v', -0.2787361934305595e-02), ('vort', 0.9160626946271506e-10)]
+    mfd_first_row = mfd.isel(time=[0], npart=[0])
+    for var, value in vars_values:
+        np.testing.assert_almost_equal(mfd[var].values[0][0], value, 8)
