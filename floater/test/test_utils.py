@@ -39,6 +39,7 @@ def mitgcm_float_datadir(tmpdir_factory, request):
     tar.close()
     return target_dir
 
+@pytest.fixture(scope='module')
 def mitgcm_float_datadir_csv(tmpdir_factory, request):
     filename = request.module.__file__
     datafile = os.path.join(os.path.dirname(filename), _TESTDATA_FILENAME_CSV)
@@ -86,11 +87,14 @@ def test_floats_to_bcolz(tmpdir, mitgcm_float_datadir):
     for name, val in zip(_NAMES, _TESTVALS_FIRST):
         np.testing.assert_almost_equal(bc[0][name], val)
 
-def test_floats_to_netcdf(tmpdir, mitgcm_float_datadir):
+def test_floats_to_netcdf(mitgcm_float_datadir_csv):
     """Test that we can convert MITgcm float data into NetCDF format.
     """
-    input_dir = str(mitgcm_float_datadir_csv)
-    output_dir = str(tmpdir)
+    import xarray as xr
 
-    print('input_dir:', input_dir)
-    print('output_dir', output_dir)
+    input_dir = str(mitgcm_float_datadir_csv) + '/'
+    os.chdir(input_dir)
+    utils.floats_to_netcdf(input_dir, output_fname='test',
+                           float_file_prefix='float_trajectories',
+                           ref_time=None)
+    mfd = xr.open_mfdataset('test.nc/*.nc')

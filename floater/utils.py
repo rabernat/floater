@@ -219,7 +219,8 @@ def floats_to_castra(input_dir, output_fname, progress=False, **kwargs):
             c = Castra(output_fname, template=df)
         c.extend(df)
 
-def floats_to_netcdf(input_dir, output_fname, float_file_prefix,
+def floats_to_netcdf(input_dir, output_fname,
+                     float_file_prefix,
                      ref_time, step_time=86400):
     """Convert MITgcm float data to NetCDF format.
 
@@ -239,6 +240,8 @@ def floats_to_netcdf(input_dir, output_fname, float_file_prefix,
     import dask.dataframe as dd
     import xarray as xr
     from glob import glob
+
+    output_fname = _maybe_add_suffix(output_fname, '.nc')
 
     float_files = glob(float_file_prefix+'.*.csv')
     float_digits = 10
@@ -268,5 +271,8 @@ def floats_to_netcdf(input_dir, output_fname, float_file_prefix,
         var_shape = (1, len(npart))
         data_vars = {var_name: (['time', 'npart'], dfcs[var_name].values.reshape(var_shape)) for var_name in var_names}
         ds = xr.Dataset(data_vars, coords={'time': time, 'npart': npart})
-        output_path = input_dir + output_fname + '/' + float_timestep + '.nc'
+        output_dir = input_dir + output_fname + '/'
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        output_path = output_dir + float_timestep + '.nc'
         ds.to_netcdf(output_path)
