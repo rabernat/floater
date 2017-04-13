@@ -221,7 +221,8 @@ def floats_to_castra(input_dir, output_fname, progress=False, **kwargs):
 
 def floats_to_netcdf(input_dir, output_fname,
                      float_file_prefix,
-                     ref_time, step_time=86400):
+                     ref_time, step_time,
+                     output_dir, output_prefix):
     """Convert MITgcm float data to NetCDF format.
 
     Parameters
@@ -259,7 +260,7 @@ def floats_to_netcdf(input_dir, output_fname,
         input_path = input_dir + float_timestep + '.*.csv'
         df = dd.read_csv(input_path, names=float_columns, dtype=float_dtypes, header=None)
         dfc = df.compute()
-        dfcs = dfc.sort('npart')
+        dfcs = dfc.sort_values('npart')
         step_num = int(dfcs.time.values[0])//step_time
         if ref_time is not None:
             ref_time = np.datetime64(ref_time, 'ns')
@@ -271,8 +272,8 @@ def floats_to_netcdf(input_dir, output_fname,
         var_shape = (1, len(npart))
         data_vars = {var_name: (['time', 'npart'], dfcs[var_name].values.reshape(var_shape)) for var_name in var_names}
         ds = xr.Dataset(data_vars, coords={'time': time, 'npart': npart})
-        output_dir = input_dir + output_fname + '/'
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-        output_path = output_dir + float_timestep + '.nc'
-        ds.to_netcdf(output_path)
+        output_path = output_dir + output_fname + '/'
+        if not os.path.exists(output_path):
+            os.makedirs(output_path)
+        output_nc = output_path + output_prefix + float_timestep[-(float_digits+1):] + '.nc'
+        ds.to_netcdf(output_nc)

@@ -88,26 +88,31 @@ def test_floats_to_bcolz(tmpdir, mitgcm_float_datadir):
     for name, val in zip(_NAMES, _TESTVALS_FIRST):
         np.testing.assert_almost_equal(bc[0][name], val)
 
-def test_floats_to_netcdf(mitgcm_float_datadir_csv):
+def test_floats_to_netcdf(tmpdir, mitgcm_float_datadir_csv):
     """Test that we can convert MITgcm float data into NetCDF format.
     """
     import xarray as xr
 
     input_dir = str(mitgcm_float_datadir_csv) + '/'
-    os.chdir(input_dir)
-    utils.floats_to_netcdf(input_dir, output_fname='test',
-                           float_file_prefix='float_trajectories',
-                           ref_time=None)
-    mfd = xr.open_mfdataset('test.nc/*.nc')
+    output_dir = str(tmpdir) + '/'
 
-    # dimensions
+    os.chdir(input_dir)
+    utils.floats_to_netcdf(input_dir=input_dir, output_fname='test',
+                           float_file_prefix='float_trajectories',
+                           ref_time=None, step_time=86400,
+                           output_dir=output_dir, output_prefix='prefix_test')
+
+    # filename prefix test
+    os.chdir(output_dir)
+    mfd = xr.open_mfdataset('test.nc/prefix_test.*.nc')
+
+    # dimensions test
     dims = {'npart': 40, 'time': 2}
     assert mfd.dims == dims
 
-    # variables and values
+    # variables and values test
     vars_values = [('x',  0.3237109375000000e+03), ('y',   -0.7798437500000000e+02),
                    ('z', -0.4999999999999893e+00), ('u',   -0.5346306607990328e-02),
                    ('v', -0.2787361934305595e-02), ('vort', 0.9160626946271506e-10)]
-    mfd_first_row = mfd.isel(time=[0], npart=[0])
     for var, value in vars_values:
         np.testing.assert_almost_equal(mfd[var].values[0][0], value, 8)
