@@ -256,7 +256,6 @@ def floats_to_netcdf(input_dir, output_fname,
     var_float = [(var, np.float32) for var in float_columns[1:]]
     float_dtypes = np.dtype(var_int+var_float)
 
-    test = []
     for float_timestep in float_timesteps:
         input_path = input_dir + float_timestep + '.*.csv'
         df = dd.read_csv(input_path, names=float_columns, dtype=float_dtypes, header=None)
