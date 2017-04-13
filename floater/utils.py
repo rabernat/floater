@@ -256,11 +256,13 @@ def floats_to_netcdf(input_dir, output_fname,
     var_float = [(var, np.float32) for var in float_columns[1:]]
     float_dtypes = np.dtype(var_int+var_float)
 
+    test = []
     for float_timestep in float_timesteps:
         input_path = input_dir + float_timestep + '.*.csv'
         df = dd.read_csv(input_path, names=float_columns, dtype=float_dtypes, header=None)
         dfc = df.compute()
         dfcs = dfc.sort_values('npart')
+        step_time = int(step_time)
         step_num = int(dfcs.time.values[0])//step_time
         if ref_time is not None:
             ref_time = np.datetime64(ref_time, 'ns')
