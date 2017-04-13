@@ -93,7 +93,7 @@ class FloatSet(object):
 
         xx, yy = np.meshgrid(self.x, self.y)
         if self.model_grid is not None:
-            xx, yy = _subset_floats_from_mask(xx, yy, self.model_grid)
+            xx, yy = self.subset_floats_from_mask(xx, yy)
         return xx, yy
 
 
@@ -114,7 +114,7 @@ class FloatSet(object):
         xx[1::2] -= self.dx/4
 
         if self.model_grid is not None:
-            xx, yy = _subset_floats_from_mask(xx, yy, self.model_grid)
+            xx, yy = self.subset_floats_from_mask(xx, yy)
         return xx, yy
 
 
@@ -271,61 +271,61 @@ class FloatSet(object):
             The filename to load in the saved floatset data from
             (e.g. 'floatset.pkl')
         """
-
+        self.ocean_bools = None #instantiate bef. updating
         with open(filename, 'rb') as file:
             self.__dict__.update(pickle.load(file).__dict__)
 
 
 
-def _subset_floats_from_mask(xx, yy, model_grid):
-    """Eliminate float positions that are on land land mask.
+    def subset_floats_from_mask(self, xx, yy):
+        """Eliminate float positions that are on land land mask.
 
-    PARAMETERS
-    ----------
-    xx : arraylike
-        float longitudes
-    yy : arraylike
-        float latitudes
-    model_grid : dictionary
-        the following key value pairs are expected
-            'land_mask': np.ndarray of bools
-                2d array of dimensions in C order: shape==(len(lat), len(lon))
-                An element is True iff the corresponding tracer cell grid point
-                is unmasked (ocean)
-            'lon': 1d array of the mask grid longitudes
-            'lat': 1d array of the mask grid latitudes
+        PARAMETERS
+        ----------
+        xx : arraylike
+            float longitudes
+        yy : arraylike
+            float latitudes
+        model_grid : dictionary
+            the following key value pairs are expected
+                'land_mask': np.ndarray of bools
+                    2d array of dimensions in C order: shape==(len(lat), len(lon))
+                    An element is True iff the corresponding tracer cell grid point
+                    is unmasked (ocean)
+                'lon': 1d array of the mask grid longitudes
+                'lat': 1d array of the mask grid latitudes
 
-    RETURNS
-    -------
-    xx_masked, yy_masked: np.ndarray
-        1D arrays of float coordinates subarrays:
-    """
+        RETURNS
+        -------
+        xx_masked, yy_masked: np.ndarray
+            1D arrays of float coordinates subarrays:
+        """
 
-    xx = xx.ravel()
-    yy = yy.ravel()
+        xx = xx.ravel()
+        yy = yy.ravel()
 
-    mask_lon = model_grid['lon']
-    mask_lat = model_grid['lat']
-    land_mask = model_grid['land_mask']
-    # we require the array to be using using C order
-    assert land_mask.shape == (len(mask_lat), len(mask_lon))
+        mask_lon = self.model_grid['lon']
+        mask_lat = self.model_grid['lat']
+        land_mask = self.model_grid['land_mask']
+        # we require the array to be using using C order
+        assert land_mask.shape == (len(mask_lat), len(mask_lon))
 
-    # fast cartesian product
-    mask_geo = np.dstack(np.meshgrid(mask_lon, mask_lat))
-    mask_geo = mask_geo.reshape(-1, 2)
+        # fast cartesian product
+        mask_geo = np.dstack(np.meshgrid(mask_lon, mask_lat))
+        mask_geo = mask_geo.reshape(-1, 2)
 
-    mask_bool_flat = land_mask.ravel()
-    mask_xyz = geo_to_xyz(mask_geo)
-    # a KDTree of the mask data in xyz form
-    mask_tree = cKDTree(mask_xyz)
-    floats_geo = np.transpose([xx.ravel(), yy.ravel()])
-    # uniform hexagonal tiling
-    queries_xyz = geo_to_xyz(floats_geo)
-    # search for nearest neighbors
-    dist, neighbor_indices = mask_tree.query(queries_xyz, n_jobs=-1)
-    ocean_bools = np.take(mask_bool_flat, neighbor_indices.ravel()) # True -> neighbor is tracer ocean
-    floats_ocean = floats_geo[np.nonzero(ocean_bools.astype('int'))].T
+        mask_bool_flat = land_mask.ravel()
+        mask_xyz = geo_to_xyz(mask_geo)
+        # a KDTree of the mask data in xyz form
+        mask_tree = cKDTree(mask_xyz)
+        floats_geo = np.transpose([xx.ravel(), yy.ravel()])
+        # uniform hexagonal tiling
+        queries_xyz = geo_to_xyz(floats_geo)
+        # search for nearest neighbors
+        dist, neighbor_indices = mask_tree.query(queries_xyz, n_jobs=-1)
+        self.ocean_bools = np.take(mask_bool_flat, neighbor_indices.ravel()) # True -> neighbor is tracer ocean
+        floats_ocean = floats_geo[np.nonzero(self.ocean_bools.astype('int'))].T
 
-    return floats_ocean
+        return floats_ocean
 
 
