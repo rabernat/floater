@@ -27,7 +27,7 @@ parser.add_argument('--keep_fields', type=str,
                     default=None, metavar='FIELDS',
                     help="comma-dilimited list of data fields to retain")
 
-parser.add_argument('--output_dir', default='./', metavar='OF',
+parser.add_argument('--output_dir', default='./', metavar='OD',
                     help='directory in which to store the transcoded float files')
 
 parser.add_argument('--output_prefix', default='float_trajectories', metavar='OP',

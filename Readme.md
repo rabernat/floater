@@ -17,6 +17,7 @@ $ floater_convert
 usage: floater_convert [-h] [--float_file_prefix PREFIX] [--float_buf_dim N]
                        [--progress] [--input_dir DIR] [--output_format FMT]
                        [--keep_fields FIELDS] [--ref_time RT] [--step_time ST]
+                       [--output_dir OD] [--output_prefix OP]
                        output_file
 ```
 
