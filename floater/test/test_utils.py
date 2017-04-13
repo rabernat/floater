@@ -16,6 +16,10 @@ _TESTVALS_FIRST = (1127925.0, 6134400.0, 247.69285583496094, -63.59305191040039,
                  -0.08639287948608398, 0.12957383692264557, -0.12062723934650421,
                  0.0, 0.0, 2.6598372642183676e-06)
 
+_TESTDATA_FILENAME_CSV = 'sample_mitgcm_float_trajectories_csv.tar.gz'
+_TMPDIR_SUBDIR_CSV = 'sample_mitgcm_data_csv'
+
+
 #@pytest.fixture()
 #def empty_output_dir(tmpdir):
 #    return tmpdir.mkdir('test')
@@ -31,6 +35,18 @@ def mitgcm_float_datadir(tmpdir_factory, request):
     # tmpdir_factory returns LocalPath objects
     # for stuff to work, has to be converted to string
     target_dir = str(tmpdir_factory.mktemp(_TMPDIR_SUBDIR))
+    tar = tarfile.open(datafile)
+    tar.extractall(target_dir)
+    tar.close()
+    return target_dir
+
+@pytest.fixture(scope='module')
+def mitgcm_float_datadir_csv(tmpdir_factory, request):
+    filename = request.module.__file__
+    datafile = os.path.join(os.path.dirname(filename), _TESTDATA_FILENAME_CSV)
+    if not os.path.exists(datafile):
+        raise IOError('Could not find data file %s' % datafile)
+    target_dir = str(tmpdir_factory.mktemp(_TMPDIR_SUBDIR_CSV))
     tar = tarfile.open(datafile)
     tar.extractall(target_dir)
     tar.close()
@@ -71,3 +87,32 @@ def test_floats_to_bcolz(tmpdir, mitgcm_float_datadir):
     # now make sure the values are in the correct range
     for name, val in zip(_NAMES, _TESTVALS_FIRST):
         np.testing.assert_almost_equal(bc[0][name], val)
+
+def test_floats_to_netcdf(tmpdir, mitgcm_float_datadir_csv):
+    """Test that we can convert MITgcm float data into NetCDF format.
+    """
+    import xarray as xr
+
+    input_dir = str(mitgcm_float_datadir_csv) + '/'
+    output_dir = str(tmpdir) + '/'
+
+    os.chdir(input_dir)
+    utils.floats_to_netcdf(input_dir=input_dir, output_fname='test',
+                           float_file_prefix='float_trajectories',
+                           ref_time=None, step_time=86400,
+                           output_dir=output_dir, output_prefix='prefix_test')
+
+    # filename prefix test
+    os.chdir(output_dir)
+    mfd = xr.open_mfdataset('test.nc/prefix_test.*.nc')
+
+    # dimensions test
+    dims = {'npart': 40, 'time': 2}
+    assert mfd.dims == dims
+
+    # variables and values test
+    vars_values = [('x',  0.3237109375000000e+03), ('y',   -0.7798437500000000e+02),
+                   ('z', -0.4999999999999893e+00), ('u',   -0.5346306607990328e-02),
+                   ('v', -0.2787361934305595e-02), ('vort', 0.9160626946271506e-10)]
+    for var, value in vars_values:
+        np.testing.assert_almost_equal(mfd[var].values[0][0], value, 8)

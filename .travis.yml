@@ -20,7 +20,7 @@ addons:
       - g++-4.8
 
 env:
-  - CONDA_PACKAGES="numpy scipy cython pandas bcolz pytest future"
+  - CONDA_PACKAGES="numpy scipy cython pandas bcolz pytest future xarray dask"
 # need to use include
 #  - CC="gcc-4.8"
 
