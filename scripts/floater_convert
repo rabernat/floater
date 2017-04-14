@@ -36,7 +36,7 @@ parser.add_argument('--output_prefix', default='float_trajectories', metavar='OP
 parser.add_argument('--ref_time', default=None, metavar='RT',
                     help='reference time, format: YYYY-MM-DD')
 
-parser.add_argument('--step_time', default=86400, metavar='ST', type=int,
+parser.add_argument('--step_time', default=86400, metavar='ST',
                     help='step time, unit: second')
 
 parser.add_argument('output_file',
