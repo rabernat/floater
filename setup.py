@@ -16,7 +16,7 @@ extra_link_args = ["-std=c++11"]
 #extra_compile_args = ["-std=gnu++11"]
 #extra_link_args = ["-std=gnu++11"]
 
-runtime_library_dirs = ['/usr/local/gcc-4.8/lib']
+runtime_library_dirs = []#['/usr/local/gcc-4.8/lib']
 
 # check for openmp following
 # http://stackoverflow.com/questions/16549893/programatically-testing-for-openmp-support-from-a-python-setup-script

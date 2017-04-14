@@ -137,10 +137,7 @@ class HexgridStandaloneFunctionTester(unittest.TestCase):
         # Kelvin's cats eyes flow
         a = 0.8
         psi = np.log(np.cosh(y) + a*np.cos(x)) - np.log(1 + a)
-        #cr = hexgrid.find_convex_regions(-psi.reshape(nx,nx))
-        cr = hexgrid.find_convex_regions(-psi.reshape(nx,nx),
-                                 minsize=300, maxsize=3000,
-                                 target_convexity_deficiency=0.1)
+        cr = hexgrid.find_convex_regions(-psi.reshape(nx,nx))
         self.assertEqual(len(cr), 1)
         hr = cr[0]
         self.assertTrue(np.all(psi[list(hr.members)]<0))
@@ -151,10 +148,8 @@ class HexgridStandaloneFunctionTester(unittest.TestCase):
         psiset.remove(5085)
         self.assertSetEqual(psiset, hr.members)
         # test minsize kwarg
-        #cr = hexgrid.find_convex_regions(-psi.reshape(nx,nx), minsize=1e6)
-        #self.assertEqual(len(cr), 0)
-
-        #
+        cr = hexgrid.find_convex_regions(-psi.reshape(nx,nx), minsize=1e6)
+        self.assertEqual(len(cr), 0)
 
 boundary_examples = """
 Exterior Boundary
