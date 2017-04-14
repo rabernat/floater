@@ -242,7 +242,7 @@ def floats_to_netcdf(input_dir, output_fname,
     import xarray as xr
     from glob import glob
 
-    output_fname = _maybe_add_suffix(output_fname, '.nc')
+    output_fname = _maybe_add_suffix(output_fname, '_netcdf')
 
     float_files = glob(float_file_prefix+'.*.csv')
     float_digits = 10
