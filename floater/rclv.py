@@ -4,8 +4,27 @@ from skimage.measure import find_contours, points_in_poly, grid_points_in_poly
 from skimage.feature import peak_local_max
 from skimage.morphology import convex_hull_image, watershed
 from scipy.spatial import qhull
-# still need polygon area routine from hexgrid
-from . hexgrid import polygon_area
+
+
+def polygon_area(verts):
+    """Compute the area of a polygon.
+
+    Parameters
+    ----------
+    verts : array_like
+        2D shape (N,2) array of vertices. Uses scikit image convetions
+        (j,i indexing)
+
+    Returns
+    area : float
+        Area of polygon enclolsed by verts. Sign is determined by vertex
+        order (cc vs ccw)
+    """
+    verts_roll = np.roll(verts, 1, axis=0)
+    # use scikit image convetions (j,i indexing)
+    area_elements = ((verts_roll[:,1] + verts[:,1]) *
+                     (verts_roll[:,0] - verts[:,0]))
+    return area_elements.sum()/2.0
 
 
 def get_local_region(data, ji, border_j, border_i):
@@ -77,6 +96,38 @@ def find_contour_around_maximum(data, ji, level, border_j=(5,5), border_i=(5,5))
             grow_right |= (con[0][1] == ni-1) or (con[-1][1] == ni-1)
 
     return target_con, region_data, border_j, border_i
+
+
+def contour_area(con):
+    """Calculate the area, convex hull area, and convexity deficiency
+    of a polygon contour.
+
+    Parameters
+    ----------
+    con : arraylike
+        A 2D array of vertices with shape (N,2) that follows the scikit
+        image conventions (con[:,0] are j indices)
+
+    Returns
+    -------
+    region_area : float
+    hull_area : float
+    convexity_deficiency : fload
+    """
+    # reshape the data to x, y order
+    con_points = con[:,::-1]
+
+    # calculate area of polygon
+    region_area = abs(polygon_area(con_points))
+
+    # find convex hull
+    hull = qhull.ConvexHull(con_points)
+    #hull_points = np.array([con_points[pt] for pt in hull.vertices])
+    hull_area = hull.volume
+
+    cd = (hull_area - region_area ) / region_area
+
+    return region_area, hull_area, cd
 
 
 def convex_contour_around_maximum(data, ji, step, border=5,
@@ -156,7 +207,7 @@ def convex_contour_around_maximum(data, ji, step, border=5,
 
 
 def find_convex_contours(data, min_distance=5, min_area=100.,
-                             step=1e-7, convex_def=0.01, verbose=False):
+                             step=1e-7, convex_def=0.001, verbose=False):
     """Find the outermost convex contours around the maxima of
     data with specified convexity deficiency.
 
@@ -189,6 +240,6 @@ def find_convex_contours(data, min_distance=5, min_area=100.,
 
     for ji in plm:
         contour, area = convex_contour_around_maximum(data, ji, 1e-7, border=5,
-                                                      convex_def=cd, verbose=verbose)
+                                                      convex_def=convex_def, verbose=verbose)
         if area >= min_area:
             yield ji, contour, area

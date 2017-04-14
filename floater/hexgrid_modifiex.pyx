@@ -14,6 +14,9 @@ from cython.parallel cimport prange, threadid
 from scipy.spatial import qhull
 #import matplotlib.path as mplPath
 
+#from cython.operator cimport dereference as deref, preincrement as inc
+
+
 # integer indices
 DTYPE_int = np.int32
 ctypedef np.int32_t DTYPE_int_t
@@ -27,13 +30,18 @@ ctypedef np.float64_t DTYPE_flt_t
 
 # special value for border points
 cdef DTYPE_int_t INT_NOT_FOUND = -9999
+# maximum iterations in search algorithms
+cdef size_t MAX_ITERS = 1000000
+# flag for failed convexity deficiency test
+cdef DTYPE_flt_t CONVEX_DEF_UNDEFINED = -9999999999.
 
+@cython.final
 cdef class HexArray:
     # array shape
     cdef readonly DTYPE_int_t Nx, Ny, N
     cdef readonly bint index_right, has_data
     # raveled array data
-    cdef DTYPE_flt_t [:] ar
+    cdef public DTYPE_flt_t [:] ar
 
     def __init__(self, np.ndarray[DTYPE_flt_t, ndim=2] data=None,
                         shape=None, idx_right=1):
@@ -246,6 +254,7 @@ cdef class HexArray:
         cpoints = self.classify_critical_points()
         return np.nonzero(cpoints.ravel()==1)[0].astype(DTYPE_int)
 
+@cython.final
 cdef class HexArrayRegion:
 
     # the parent region
@@ -278,7 +287,7 @@ cdef class HexArrayRegion:
     def add_point(self, int pt):
         self._add_point(pt)
 
-    cdef void _add_point(self, int pt) nogil:
+    cpdef void _add_point(self, int pt) nogil:
         self.members.insert(pt)
 
     def remove_point(self, int pt):
@@ -290,7 +299,7 @@ cdef class HexArrayRegion:
     def exterior_boundary(self):
         return self._exterior_boundary()
 
-    cdef unordered_set[int] _exterior_boundary(self) nogil:
+    cpdef unordered_set[int] _exterior_boundary(self) nogil:
         cdef unordered_set[int] boundary
         cdef int n, k
         cdef int* nbr
@@ -331,57 +340,318 @@ cdef class HexArrayRegion:
         free(nbr)
         return result
 
+    cpdef int _vertex_orientation(self, int startpt, size_t n) nogil:
+        """Check the boundary orientation of a vertex originating at startpt
+        in the n-th direction."""
+        cdef int* nbr
+        cdef int orth_vert_left, orth_vert_right
+        cdef int is_inside_left, is_inside_right
+
+        nbr = self.ha._neighbors(startpt)
+        if nbr[0] == INT_NOT_FOUND:
+            free(nbr)
+            # don't even try to orient if we are on a boundary
+            return INT_NOT_FOUND
+        #orth_vert_left = nbr[(n+1) % 6]
+        #orth_vert_right = nbr[(n-1) % 6]
+        if n==5:
+            orth_vert_left = nbr[0]
+        else:
+            orth_vert_left = nbr[n+1]
+        if n==0:
+            orth_vert_right = nbr[5]
+        else:
+            orth_vert_right = nbr[n-1]
+        free(nbr)
+        # for positive orientation of the boundary, we want
+        # orth_vert_right OUTSIDE the region and orth_vert_left INSIDE,
+        # a vector pointing normal to the boundary following the
+        # right-hand rule
+        is_inside_left = self.members.count(orth_vert_left)==1
+        is_inside_right = self.members.count(orth_vert_right)==1
+        #with gil:
+        #    print 'vertex_orientation:', n, is_inside_left, is_inside_right
+        return (is_inside_left - is_inside_right)
+
+
     def interior_boundary_ordered(self):
         return self._interior_boundary_ordered()
 
-    cdef vector[int] _interior_boundary_ordered(self) nogil:
+    cpdef vector[int] _interior_boundary_ordered(self) nogil:
+        """Find the ordered interior boundary of a simply-connected
+        hexarray region.
+
+        Returns an *empty vector* if any line segments are found in the region.
+        Some reasons why:
+            - Line segments are not locally orientable (although they may be
+              globally orientable)
+            - Line segments attached to regions cause the iteration to go
+              into an infinite look because it never gets back onto the line.
+              (This could probably be fixed with some more complex logic), but...
+            - We will never want to keep such regions
+        """
         cdef vector[int] boundary
+        cdef vector[int] failure
         cdef int* nbr
-        cdef int n, initpt, startpt, prevpt
-        cdef bint looking = 1
-        cdef size_t cnt=0,
-        cdef size_t cntmax=100
+        cdef int n, initpt, startpt, prevpt, testpt, nextpt, nextpt_line, n_start
+        cdef size_t nbr_count, line_neighbor_count, origin_visit_count
+        cdef int orth_vert_left, orth_vert_right, nvertex
+        cdef int inc, n_idx, is_inside_left, is_inside_right
+        cdef bint already_in_boundary
+        cdef size_t cnt = 0
+        cdef size_t cntmax = 100
+        cdef size_t cnt_back
+        # +1: positive orientation (right hand rule: counterclockwise path around center)
+        # -1: negative orientation (clockwise path around center)
+        # 0: not determined yet
+        cdef int orientation = 0
+        cdef int test_orientation
         # first just find any point on the boundary
         for n in self.members:
             if self._is_boundary(n):
                 boundary.push_back(n)
                 initpt = n
+                startpt = n
                 break
-        # now iterate through neighbors, looking for other boundary points
 
-        startpt = initpt
-        prevpt = initpt
+        # now get another point to form a vertex
+        nextpt = -1
+        nvertex = -1
+        line_neighbor_count = 0
+        nbr_count = 0
+        nbr = self.ha._neighbors(startpt)
+        if nbr[0] != INT_NOT_FOUND:
+            for n in range(6):
+                testpt = nbr[n]
+                # only consider points that are still in the region...
+                if self.members.count(testpt)==1:
+                    # ...and on the boundary
+                    nbr_count += 1
+                    if self._is_boundary(testpt):
+                        nextpt = testpt
+                        # we can stop searching if we got an orientation
+                        orientation = self._vertex_orientation(startpt, n)
+                        if orientation != 0:
+                            nvertex = n
+                        else:
+                            # a neigbhor point with no orientation is a line
+                            line_neighbor_count += 1
+
+        # override nextpt if we got an orientation
+        if nvertex != -1:
+            nextpt = nbr[nvertex]
+            n = nvertex
+        free(nbr)
+
+        if nextpt == -1:
+            return failure
+
+        #with gil:
+        #    print "line_neigbor_count: %g" % line_neighbor_count
+
+        if (nbr_count > 1) and (line_neighbor_count > 0):
+            # we need to revisit the origin twice!
+            origin_visit_count = 2
+        else:
+            origin_visit_count = 1
+
+        # index mapping from one point to the next
+
+        #
+        # FORWARD NEIGHBOR INDICES
+        #
+        #     4     3
+        #
+        #  5     p     2
+        #
+        #     0     1
+        #
+        #
+        # BACKWARD NEIGHBOR INDICES
+        #
+        #     1     0
+        #
+        #  2     p     5
+        #
+        #     3     4
+        #
+        # Examples of weird connectivity
+        #
+        #     x     x             x     o             x     o
+        #
+        #  o     p     o      o      p     x      o      p      o
+        #
+        #     x     x             x     o             x    x
+        #
+        # What do these have in common? at least two gaps between
+        #
+        # here is one idea: if the starting point has any line-like neighbors,
+        # we know we need to visit it *twice* before we are done
+
+
         cnt = 0
-        while looking==1:
-            # get the neighbors of the most recently added point
-            looking = 0
+        #while nextpt != initpt:
+        while origin_visit_count > 0:
+            # shift everything forward
+            boundary.push_back(nextpt)
+            prevpt = startpt
+            startpt = nextpt
+            nextpt = -1
+
+            # always check orientation
+            # ************************
+            # the previous vertex is now (prevtpt, startpt)
+            # startpt is the nth neighbot of prevpt
+            test_orientation = self._vertex_orientation(prevpt, n)
+            # check for boundary error
+            if test_orientation == INT_NOT_FOUND:
+                return failure
+            #with gil:
+            #    print('Got test orientation %g' % test_orientation)
+
+
+            if orientation == 0:
+                if test_orientation != 0:
+                    # we found the orientation
+                    orientation = test_orientation
+            else:
+                # make sure this orientation is consistent
+                # if we encounter a different test_orientation after orientation
+                # is already set, it means this is a multiply connected or
+                # otherwise messed up region
+                if test_orientation != 0:
+                    if orientation != test_orientation:
+                        return failure
+
+
+            # now we can walk to the next point
+
             nbr = self.ha._neighbors(startpt)
             if nbr[0] == INT_NOT_FOUND:
-                # we are on a boundary, stop iterating
-                pass
+                # on a boundary
+                # nextpt = initpt
+                return failure
+
+            # figure out where the previous link is coming from
+            n_start = (n + 3) % 6
+
+            # the search direction (angular)
+            if orientation < 0:
+                inc = -1
             else:
-                for n in range(6):
-                    # check to see if neighbor point is also on boundary
-                    if self.members.count(nbr[n])==1:
-                        if self._is_boundary(nbr[n]):
-                            if ((nbr[n] != startpt) and
-                                (nbr[n] != prevpt) and
-                                (nbr[n] != initpt)):
-                                # stop iterating once we have found a good point
-                                #print 'from', startpt, 'adding', nbr[n]
-                                boundary.push_back(nbr[n])
-                                prevpt = startpt
-                                startpt = nbr[n]
-                                looking = 1
-                                break
-                            else:
-                                # if we got here, the circle is closed
-                                pass
-            free(nbr)
+                # if orientation is 0, doesn't matter what direction we search
+                inc = 1
+
+            # check the neighbor points in the proper order
+            for n_idx in range(1, 7):
+                # index of the neighbor point to check
+                n = (n_start + inc*n_idx) % 6
+                testpt = nbr[n]
+                if self.members.count(testpt)==1:
+                    # found our next point
+                    nextpt = testpt
+                    break
+
             cnt += 1
-            #if cnt>cntmax:
-            #    break
+            if cnt > MAX_ITERS:
+                break
+
+            free(nbr)
+
+            # we are about to visit the origin:
+            if nextpt == initpt:
+                # decrement origin visit counter
+                origin_visit_count -= 1
+
+        # make sure we actually got all the points
+        # for certain pathalogical regions, we won't actually detect all the
+        # boundary points
+        # potentiall expensive call to _interior_boundary
+        # check that each point in the interior boundary is also in the
+        # ordered interior boundary
+        #if boundary.size() < self._interior_boundary().size():
+        #    return boundary
+        #else:
+        #    return failure
         return boundary
+
+    def area(self):
+        cdef vector[int] ibo = self._interior_boundary_ordered()
+        return self._area_from_interior_boundary(ibo)
+
+    # http://www.mathopenref.com/coordpolygonarea2.html
+    cpdef DTYPE_flt_t _area_from_interior_boundary(self, vector[int] ibo) nogil:
+        #cdef vector[int] ibo = self._interior_boundary_ordered()
+        cdef DTYPE_flt_t x0, y0, x1, y1
+        cdef size_t nverts = ibo.size()
+        # vertex loop counter
+        cdef size_t i = 0
+        # other vertex loop counter
+        # The last vertex is the 'previous' one to the first
+        cdef size_t j = nverts - 1
+        # accumulates area in the loop
+        cdef DTYPE_flt_t area = 0.0
+        for i in range(nverts):
+            x0 = self.ha._xpos(ibo[i])
+            y0 = self.ha._ypos(ibo[i])
+            x1 = self.ha._xpos(ibo[j])
+            y1 = self.ha._ypos(ibo[j])
+            area += (x1 + x0) * (y1 - y0)
+            #with gil:
+            #    print('x0, y0, x1, y1, area: %g, %g, %g, %g, %g' % (x0, y0, x1, y1, area))
+            j = i
+
+        # we don't know the area, so we need to normalize
+        if area < 0:
+            return -area/2.0
+        else:
+            return area/2.0
+
+    def convex_hull_area(self):
+        cdef vector[int] ibo = self._interior_boundary_ordered()
+        return self._convex_hull_area_from_interior_boundary(ibo)
+
+    cpdef DTYPE_flt_t _convex_hull_area_from_interior_boundary(self, vector[int] ibo) nogil:
+        # interior boundary
+        #cdef unordered_set[int] ib = self._interior_boundary()
+        cdef DTYPE_flt_t [:,:] ib_points
+        cdef size_t nib = ibo.size()
+
+        # vertices of hull
+        cdef DTYPE_flt_t [:,:] hull_vertices
+        cdef DTYPE_flt_t hull_area
+        # worth making a view? how to release gil?
+
+        cdef size_t npt, nhull, Nverts
+        cdef size_t n = 0
+
+        with gil:
+            ib_points = np.empty((nib, 2), dtype=DTYPE_flt)
+        for npt in ibo:
+            ib_points[n,0] = self.ha._xpos(npt)
+            ib_points[n,1] = self.ha._ypos(npt)
+            n += 1
+
+        with gil:
+            hull_area = _get_qhull_area(ib_points)
+
+        return hull_area
+
+    cpdef DTYPE_flt_t convexity_deficiency(self) nogil:
+        cdef DTYPE_flt_t region_area, hull_area
+        cdef vector[int] ibo = self._interior_boundary_ordered()
+        region_area = self._area_from_interior_boundary(ibo)
+        #with gil:
+        #    print('region_area %e' % region_area)
+        # only bother moving on if area is nonzero
+        if region_area > 0.0:
+            #print('calculating convex hull')
+            hull_area = self._convex_hull_area_from_interior_boundary(ibo)
+            #with gil:
+            #    print('hull_area: %f' % hull_area)
+            return (hull_area - region_area)/region_area
+        else:
+            return CONVEX_DEF_UNDEFINED
 
     def is_convex(self):
         return self._is_convex()
@@ -448,8 +718,11 @@ cdef class HexArrayRegion:
         return sc
 
 
-def find_convex_regions(np.ndarray[DTYPE_flt_t, ndim=2] a, int minsize=0,
-                        return_labeled_array=False):
+def find_convex_regions(np.ndarray[DTYPE_flt_t, ndim=2] a,
+                        int minsize=0, int maxsize=0,
+                        return_labeled_array=False,
+                        target_convexity_deficiency=1e-3
+                        ):
     """Find convex regions around the extrema of ``a``.
 
     PARAMETERS
@@ -459,31 +732,39 @@ def find_convex_regions(np.ndarray[DTYPE_flt_t, ndim=2] a, int minsize=0,
     minsize : int
         The minimum size of regions to return (number of points)
 
+    Haller: "Convexity Deficiency" is ratio of the area between the curve and
+    its convex hull to the area enclosed by the curve
+
     RETURNS
     -------
     regions : list of HexArrayRegion elements
     """
-
     cdef HexArray ha = HexArray(a)
     cdef DTYPE_int_t [:] maxima = ha.maxima()
     cdef DTYPE_int_t nmax
     # these are local to the loop
     cdef HexArrayRegion hr
     cdef unordered_set[int] bndry
-    cdef int cnt, pt, next_pt
-    cdef DTYPE_flt_t diff, diff_min
-    cdef bint first_pt, is_convex
+    cdef size_t cnt, pt, next_pt
+    cdef DTYPE_flt_t diff, diff_min, convex_def, hull_area, region_area
+    cdef bint first_pt, success
+
+
 
     regions = []
+    # need to refactor this to put into its own function
     for nmax in maxima:
         hr = HexArrayRegion(ha, nmax)
-        #ordered_points = [nmax,]
-        cnt = 0
         diff_min = 0.0
-        is_convex = True
-        while is_convex:
+        # set initial convexity deficiency to zero
+        convex_def = 0.0
+        region_area = 0.0
+        cnt = 0
+        success = 0
+        while True:
             bndry = hr._exterior_boundary()
             first_pt = True
+            # examine the boundary neighbors, looking for the next point to add
             for pt in bndry:
                 diff = ha.ar[nmax] - ha.ar[pt]
                 if first_pt:
@@ -492,20 +773,32 @@ def find_convex_regions(np.ndarray[DTYPE_flt_t, ndim=2] a, int minsize=0,
                 if diff <= diff_min:
                     next_pt = pt
                     diff_min = diff
-            # at the begnning, just add the point
-            if cnt < 3:
-                hr._add_point(next_pt)
-                #ordered_points.append(next_pt)
-                cnt += 1
-            # otherwise check for convexity
-            else:
-                if hr._still_convex(next_pt):
-                    hr._add_point(next_pt)
-                    #ordered_points.append(next_pt)
+            hr._add_point(next_pt)
+            cnt += 1
+
+            # calculate convexity deficiency
+            if cnt >= minsize:
+                convex_def = hr.convexity_deficiency()
+                if convex_def == CONVEX_DEF_UNDEFINED:
+                    # stop searching if we got a weird region
+                    break
+                elif convex_def > target_convexity_deficiency:
+                    # stop searching if we exceed convexity deficiency target
+                    break
                 else:
-                    is_convex = False
-        if hr.members.size() > minsize:
-            #regions.append((hr, ordered_points))
+                    success = 1
+
+            #print('cnt=%g, convex_def: %f' % (cnt, convex_def))
+
+            if (maxsize > 0) and (cnt>maxsize):
+                #print('exceeded count')
+                break
+
+        # if we got here, we exceeded the convexity deficiency, so we need to
+        # remove the last point
+        hr._remove_point(next_pt)
+
+        if success:
             regions.append(hr)
 
     if return_labeled_array:
@@ -580,7 +873,7 @@ cdef bint _mpl_point_in_poly(DTYPE_flt_t [:,:] verts,
 def get_qhull_verts(np.ndarray[DTYPE_flt_t, ndim=2] points):
     return np.asarray(_get_qhull_verts(points))
 
-cdef DTYPE_flt_t [:,:] _get_qhull_verts(DTYPE_flt_t [:,:] points) nogil:
+cpdef DTYPE_flt_t [:,:] _get_qhull_verts(DTYPE_flt_t [:,:] points) nogil:
     cdef DTYPE_flt_t [:,:] hull_vertices, vert_pts
     cdef DTYPE_int_t [:] vert_idx
     cdef size_t Nverts, n
@@ -602,6 +895,42 @@ cdef DTYPE_flt_t [:,:] _get_qhull_verts(DTYPE_flt_t [:,:] points) nogil:
         hull_vertices[n,0] = vert_pts[vert_idx[n],0]
         hull_vertices[n,1] = vert_pts[vert_idx[n],1]
     return hull_vertices
+
+def get_qhull_area(np.ndarray[DTYPE_flt_t, ndim=2] points):
+    return _get_qhull_area(points)
+
+cdef DTYPE_flt_t _get_qhull_area(DTYPE_flt_t [:,:] points):
+    try:
+        hull = qhull.ConvexHull(points)
+        return hull.volume
+    except:
+        return 0.0
+
+
+def polygon_area(np.ndarray[DTYPE_flt_t, ndim=2] points):
+    return _polygon_area(points)
+
+# http://www.mathopenref.com/coordpolygonarea2.html
+cdef DTYPE_flt_t _polygon_area(DTYPE_flt_t [:,:] verts) nogil:
+    cdef size_t nverts = verts.shape[0]
+    # vertex loop counter
+    cdef size_t i = 0
+    # other vertex loop counter
+    # The last vertex is the 'previous' one to the first
+    cdef size_t j = nverts - 1
+
+    # accumulates area in the loop
+    cdef DTYPE_flt_t area = 0.0;
+    for i in range(nverts):
+        area += (verts[j,0]+verts[i,0]) * (verts[j,1]-verts[i,1])
+        j = i
+
+    # minus needed because the interior boundary points are counterclockwise,
+    # not clockwise
+    return -area/2.0
+
+
+
 
 # cdef int pnpoly(int nvert, float vertx*, float verty*,
 #                 float testx*, float testy*):
