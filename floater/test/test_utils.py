@@ -107,9 +107,9 @@ def test_floats_to_netcdf(tmpdir, mitgcm_float_datadir_csv):
 
     # filename prefix test
     os.chdir(input_dir)
-    mfdl = xr.open_mfdataset('test.nc/float_trajectories.*.nc')
+    mfdl = xr.open_mfdataset('test_netcdf/float_trajectories.*.nc')
     os.chdir(output_dir)
-    mfdm = xr.open_mfdataset('test.nc/prefix_test.*.nc')
+    mfdm = xr.open_mfdataset('test_netcdf/prefix_test.*.nc')
 
     # dimensions test
     dims = {'npart': 40, 'time': 2}
