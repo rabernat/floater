@@ -269,9 +269,9 @@ def floats_to_netcdf(input_dir, output_fname,
             time = np.array([ref_time+del_time])
         else:
             time = np.array([np.int32(step_num)])
-        npart = np.int32(dfcs.npart.values)
+        npart = dfcs.npart.values.astype(np.int32)
         var_shape = (1, len(npart))
-        data_vars = {var_name: (['time', 'npart'], np.float32(dfcs[var_name].values).reshape(var_shape)) for var_name in var_names}
+        data_vars = {var_name: (['time', 'npart'], dfcs[var_name].values.astype(np.float32).reshape(var_shape)) for var_name in var_names}
         ds = xr.Dataset(data_vars, coords={'time': time, 'npart': npart})
         output_path = output_dir + output_fname + '/'
         if not os.path.exists(output_path):
