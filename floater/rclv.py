@@ -197,7 +197,7 @@ def convex_contour_around_maximum(data, ji, step, border=5,
 
     for level in contour_levels:
         if verbose:
-            print('  level: %g border: ' % level) + repr(border_j) + repr(border_i)
+            print(('  level: %g border: ' % level) + repr(border_j) + repr(border_i))
 
         try:
             # try to get a contour
@@ -295,7 +295,7 @@ def find_convex_contours(data, min_distance=5, min_area=100.,
             contour, area = convex_contour_around_maximum(data, ji, step,
                 border=min_distance, convex_def=convex_def, verbose=verbose,
                 max_footprint=max_footprint)
-            if area >= min_area:
+            if area and (area >= min_area):
                 result = ji, contour, area
         toc = time()
         #print("point " + repr(tuple(ji)) + " took %g s" % (toc-tic))
