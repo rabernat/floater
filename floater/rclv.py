@@ -143,6 +143,13 @@ def find_contour_around_maximum(data, ji, level, border_j=(5,5),
             grow_left |= (con[0][1] == 0) or (con[-1][1] == 0)
             grow_right |= (con[0][1] == ni-1) or (con[-1][1] == ni-1)
 
+	# if we got here without growing the region in any direction,
+	# we are probably in a weird situation where there is a closed
+	# contour that does not enclose the maximum
+        if target_con is None and not (
+		grow_down or grow_up or grow_left or grow_right):
+            raise ValueError("Couldn't find a contour")
+
     return target_con, region_data, border_j, border_i
 
 
