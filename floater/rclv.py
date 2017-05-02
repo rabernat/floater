@@ -143,6 +143,13 @@ def find_contour_around_maximum(data, ji, level, border_j=(5,5),
             grow_left |= (con[0][1] == 0) or (con[-1][1] == 0)
             grow_right |= (con[0][1] == ni-1) or (con[-1][1] == ni-1)
 
+	# if we got here without growing the region in any direction,
+	# we are probably in a weird situation where there is a closed
+	# contour that does not enclose the maximum
+        if target_con is None and not (
+		grow_down or grow_up or grow_left or grow_right):
+            raise ValueError("Couldn't find a contour")
+
     return target_con, region_data, border_j, border_i
 
 
@@ -197,7 +204,7 @@ def convex_contour_around_maximum(data, ji, step, border=5,
 
     for level in contour_levels:
         if verbose:
-            print('  level: %g border: ' % level) + repr(border_j) + repr(border_i)
+            print(('  level: %g border: ' % level) + repr(border_j) + repr(border_i))
 
         try:
             # try to get a contour
@@ -295,7 +302,7 @@ def find_convex_contours(data, min_distance=5, min_area=100.,
             contour, area = convex_contour_around_maximum(data, ji, step,
                 border=min_distance, convex_def=convex_def, verbose=verbose,
                 max_footprint=max_footprint)
-            if area >= min_area:
+            if area and (area >= min_area):
                 result = ji, contour, area
         toc = time()
         #print("point " + repr(tuple(ji)) + " took %g s" % (toc-tic))
