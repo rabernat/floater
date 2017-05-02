@@ -4,6 +4,7 @@ from floater import generators as gen
 import numpy as np
 import os
 import pytest
+import xarray as xr
 
 # these are all combinations of (xlim, ylim, dx, dy) that will be fed to the
 # different tests
@@ -185,6 +186,26 @@ def test_pickling_with_land(fs_with_land, tmpdir):
             for sub_key in fs.__dict__[key].keys():
                 assert np.all(fs.__dict__[key][sub_key] == fs_from_pickle.__dict__[key][sub_key])
 
+def test_npart_to_2D_array():
+    lon = np.linspace(0, 8, 9, dtype=np.float32)
+    lat = np.linspace(-4, 4, 9, dtype=np.float32)
+    land_mask = np.zeros(81)
+    for i in range(81):
+        if i%2==0:
+            land_mask[i] = 1.
+    land_mask = land_mask==1.
+    land_mask.shape = (len(lat), len(lon))
+    model_grid = {'lon': lon, 'lat': lat, 'land_mask': land_mask}
+    fs = gen.FloatSet(xlim=(0, 8), ylim=(-4, 4), dx=1, dy=1, model_grid=model_grid)
+    fs.get_rectmesh()
+
+    npart = np.linspace(1, 41, 41, dtype=np.int32)
+    values = np.random.random(41)
+    ds1d = xr.Dataset(data_vars={'test': (['npart'], values)},
+                      coords={'npart': (['npart'], npart)})
+
+    ds2d = fs.npart_to_2D_array('test', ds1d)
+    return ds2d
 
 # Nathaniel's example
 # https://github.com/rabernat/floater/issues/20
