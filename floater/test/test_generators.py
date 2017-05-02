@@ -192,9 +192,7 @@ def test_npart_to_2D_array():
     lat = np.linspace(-4, 4, 9, dtype=np.float32)
     land_mask = np.zeros(81)
     for i in range(81):
-        if i%9==0:
-            land_mask[i] = 0.
-        elif i%9==1:
+        if (i%9==0) or (i%9==1):
             land_mask[i] = 0.
         else:
             land_mask[i] = 1.
