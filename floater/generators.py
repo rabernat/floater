@@ -356,7 +356,9 @@ class FloatSet(object):
         var_list = list(df)
         index_dict = {'index': range(1, Nt+1)}
         var_dict = {var: np.zeros(Nt) for var in var_list}
-        frame_dict = {**index_dict, **var_dict}
+        frame_dict = {}
+	frame_dict.update(index_dict)
+	frame_dict.update(var_dict)
         frame = pd.DataFrame(frame_dict)
         framei = frame.set_index('index')
         ocean_bools = self.ocean_bools
