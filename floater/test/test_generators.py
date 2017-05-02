@@ -221,6 +221,7 @@ def test_npart_to_2D_array():
     mask2d = list((np.isnan(ds2d.to_array().values[0])==False).ravel())
     assert mask2d == mask1d
 
+
 # Nathaniel's example
 # https://github.com/rabernat/floater/issues/20
 # http://stackoverflow.com/questions/15094611/behavior-of-float-that-is-used-as-an-integer
