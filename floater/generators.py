@@ -3,7 +3,9 @@
 from __future__ import print_function
 
 import numpy as np
+import pandas as pd
 import pickle
+import xarray as xr
 from scipy.spatial import cKDTree
 
 
@@ -260,7 +262,7 @@ class FloatSet(object):
             The filename to save the floatset data in
             (e.g. 'floatset.pkl')
         """
-        
+
         with open(filename, 'wb') as file:
             pickle.dump(self, file, -1)
 
@@ -331,3 +333,34 @@ class FloatSet(object):
         return floats_ocean
 
 
+    def npart_to_2D_array(self, var, ds1d):
+        """Constructs 2d dataset from 1d dataset of a physical variable.
+        
+        PARAMETERS
+        ----------
+        var : str
+            The name of the physical variable
+        ds1d : 1d dataset
+            The 1d dataset of the physical variable with dimension 'npart'
+        
+        RETURNS
+        -------
+        ds2d : 2d dataset
+            The 2d dataset of the physical variable with dimensions 'lat' and 'lon'
+        """
+
+        Nx = self.Nx
+        Ny = self.Ny
+        Nt = Nx*Ny
+	frame = pd.DataFrame({'index': range(1, Nt+1), var: np.zeros(Nt)})
+        framei = lavd.set_index('index')
+        df = ds1d.to_dataframe()
+        ocean_bools = self.ocean_bools
+        framei.loc[ocean_bools==True, var] = df[var].values.astype(np.float32)
+        framei.loc[ocean_bools==False, var] = np.float32('nan')
+        frameir = framei[var].values.reshape(Ny, Nx)
+        lon = np.float32(self.x)
+        lat = np.float32(self.y)
+        ds2d = xr.Dataset(data_vars={var: (['lat', 'lon'], frameir))},
+                          coords={'lat': (['lat'], lat)), 'lon': (['lon'], lon)})
+        return ds2d
