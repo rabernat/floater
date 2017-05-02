@@ -227,7 +227,7 @@ def test_npart_to_2D_array():
     assert mask2d_da == mask1d
     for i in range(3):
         mask2d_ds = list((np.isnan(ds2d.to_array().values[i])==False).ravel())
-        assert mask2d_da == mask1d
+        assert mask2d_ds == mask1d
 
 
 # Nathaniel's example
