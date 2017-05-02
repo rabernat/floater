@@ -201,23 +201,33 @@ def test_npart_to_2D_array():
     model_grid = {'lon': lon, 'lat': lat, 'land_mask': land_mask}
     fs = gen.FloatSet(xlim=(0, 9), ylim=(-4, 5), dx=1, dy=1, model_grid=model_grid)
     fs.get_rectmesh()
+    var_list = ['test_01', 'test_02', 'test_03']
+    data_vars = {}
+    for var in var_list:
+        values = np.random.random(69)
+        data_vars.update({var: (['npart'], values)})
     npart = np.linspace(1, 69, 69, dtype=np.int32)
-    values = np.random.random(69)
-    var = 'test'
-    ds1d = xr.Dataset(data_vars={var: (['npart'], values)},
-                      coords={'npart': (['npart'], npart)})
+    coords = {'npart': (['npart'], npart)}
+    ds1d = xr.Dataset(data_vars=data_vars, coords=coords)
+    da1d = ds1d['test_01']
     # method test
-    ds2d = fs.npart_to_2D_array(var, ds1d)
+    da2d = fs.npart_to_2D_array(da1d)
+    ds2d = fs.npart_to_2D_array(ds1d)
     # shape test
-    assert ds2d.to_array().values[0].shape == (fs.Ny, fs.Nx)
-    # lon test
+    assert da2d.to_array().values.shape == (1, fs.Ny, fs.Nx)
+    assert ds2d.to_array().values.shape == (3, fs.Ny, fs.Nx)
+    # coordinates test
+    assert list(da2d.lon.values) == list(fs.x)
+    assert list(da2d.lat.values) == list(fs.y)
     assert list(ds2d.lon.values) == list(fs.x)
-    # lat test
     assert list(ds2d.lat.values) == list(fs.y)
     # mask test
     mask1d = list(fs.ocean_bools)
-    mask2d = list((np.isnan(ds2d.to_array().values[0])==False).ravel())
-    assert mask2d == mask1d
+    mask2d_da = list((np.isnan(da2d.to_array().values[0])==False).ravel())
+    assert mask2d_da == mask1d
+    for i in range(3):
+        mask2d_ds = list((np.isnan(ds2d.to_array().values[i])==False).ravel())
+        assert mask2d_da == mask1d
 
 
 # Nathaniel's example

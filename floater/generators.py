@@ -333,34 +333,41 @@ class FloatSet(object):
         return floats_ocean
 
 
-    def npart_to_2D_array(self, var, ds1d):
-        """Constructs 2d dataset from 1d dataset of a physical variable.
+    def npart_to_2D_array(self, ds1d):
+        """Constructs 2D Dataset from 1D DataArray/DataSet of single or multi-variable.
 
         PARAMETERS
         ----------
-        var : str
-            The name of the physical variable
-        ds1d : 1d dataset
-            The 1d dataset of the physical variable with dimension 'npart'
+        ds1d : 1D DataArray/Dataset
+            One-dimensional dataarray/dataset of physical variable(s) with dimension 'npart'
 
         RETURNS
         -------
-        ds2d : 2d dataset
-            The 2d dataset of the physical variable with dimensions 'lat' and 'lon'
+        ds2d : 2D Dataset
+            Two-dimensional dataset of physical variable(s) with dimensions 'lat' and 'lon'
         """
 
         Nx = self.Nx
         Ny = self.Ny
         Nt = Nx*Ny
-        frame = pd.DataFrame({'index': range(1, Nt+1), var: np.zeros(Nt)})
-        framei = frame.set_index('index')
+        if type(ds1d) == xr.core.dataarray.DataArray:
+            ds1d = ds1d.to_dataset()
         df = ds1d.to_dataframe()
+        var_list = list(df)
+        index_dict = {'index': range(1, Nt+1)}
+        var_dict = {var: np.zeros(Nt) for var in var_list}
+        frame_dict = {**index_dict, **var_dict}
+        frame = pd.DataFrame(frame_dict)
+        framei = frame.set_index('index')
         ocean_bools = self.ocean_bools
-        framei.loc[ocean_bools==True, var] = df[var].values.astype(np.float32)
-        framei.loc[ocean_bools==False, var] = np.float32('nan')
-        frameir = framei[var].values.reshape(Ny, Nx)
+        framei.loc[ocean_bools==True] = df.values.astype(np.float32)
+        framei.loc[ocean_bools==False] = np.float32('nan')
+        data_vars = {}
+        for var in var_list:
+            frameir = framei[var].values.reshape(Ny, Nx)
+            data_vars.update({var: (['lat', 'lon'], frameir)})
         lon = np.float32(self.x)
         lat = np.float32(self.y)
-        ds2d = xr.Dataset(data_vars={var: (['lat', 'lon'], frameir)},
-                          coords={'lat': (['lat'], lat), 'lon': (['lon'], lon)})
+        coords = {'lat': (['lat'], lat), 'lon': (['lon'], lon)}
+        ds2d = xr.Dataset(data_vars=data_vars, coords=coords)
         return ds2d
