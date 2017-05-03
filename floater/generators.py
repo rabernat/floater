@@ -363,8 +363,10 @@ class FloatSet(object):
         framei = frame.set_index('index')
         if self.model_grid is not None:
             ocean_bools = self.ocean_bools
-            framei.loc[ocean_bools==True] = df.values.astype(np.float32)
-            framei.loc[ocean_bools==False] = np.float32('nan')
+        else:
+            ocean_bools = np.zeros(Nt, dtype=bool)==False
+        framei.loc[ocean_bools==True] = df.values.astype(np.float32)
+        framei.loc[ocean_bools==False] = np.float32('nan')
         data_vars = {}
         for var in var_list:
             frameir = framei[var].values.reshape(Ny, Nx)
