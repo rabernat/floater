@@ -188,46 +188,57 @@ def test_pickling_with_land(fs_with_land, tmpdir):
 
 
 def test_npart_to_2D_array():
+    # floatsets
     lon = np.linspace(0, 8, 9, dtype=np.float32)
     lat = np.linspace(-4, 4, 9, dtype=np.float32)
-    land_mask = np.zeros(81)
-    for i in range(81):
-        if (i%9==0) or (i%9==1):
-            land_mask[i] = 0.
-        else:
-            land_mask[i] = 1.
-    land_mask = land_mask==1.
+    land_mask = np.zeros(81, dtype=bool)==False
     land_mask.shape = (len(lat), len(lon))
+    land_mask[:,0:2] = False
     model_grid = {'lon': lon, 'lat': lat, 'land_mask': land_mask}
-    fs = gen.FloatSet(xlim=(0, 9), ylim=(-4, 5), dx=1, dy=1, model_grid=model_grid)
-    fs.get_rectmesh()
+    fs_none = gen.FloatSet(xlim=(0, 9), ylim=(-4, 5), dx=1, dy=1)
+    fs_mask = gen.FloatSet(xlim=(0, 9), ylim=(-4, 5), dx=1, dy=1, model_grid=model_grid)
+    # dataarray/dataset
     var_list = ['test_01', 'test_02', 'test_03']
-    data_vars = {}
+    data_vars_none = {}
+    data_vars_mask = {}
     for var in var_list:
-        values = np.random.random(69)
-        data_vars.update({var: (['npart'], values)})
-    npart = np.linspace(1, 69, 69, dtype=np.int32)
-    coords = {'npart': (['npart'], npart)}
-    ds1d = xr.Dataset(data_vars=data_vars, coords=coords)
-    da1d = ds1d['test_01']
-    # method test
-    da2d = fs.npart_to_2D_array(da1d)
-    ds2d = fs.npart_to_2D_array(ds1d)
-    # shape test
-    assert da2d.to_array().values.shape == (1, fs.Ny, fs.Nx)
-    assert ds2d.to_array().values.shape == (3, fs.Ny, fs.Nx)
-    # coordinates test
-    assert list(da2d.lon.values) == list(fs.x)
-    assert list(da2d.lat.values) == list(fs.y)
-    assert list(ds2d.lon.values) == list(fs.x)
-    assert list(ds2d.lat.values) == list(fs.y)
-    # mask test
-    mask1d = list(fs.ocean_bools)
-    mask2d_da = list((np.isnan(da2d.to_array().values[0])==False).ravel())
-    assert mask2d_da == mask1d
-    for i in range(3):
-        mask2d_ds = list((np.isnan(ds2d.to_array().values[i])==False).ravel())
-        assert mask2d_ds == mask1d
+        values_none = np.random.random(81)
+        values_mask = np.random.random(69)
+        data_vars_none.update({var: (['npart'], values_none)})
+        data_vars_mask.update({var: (['npart'], values_mask)})
+    npart_none = np.linspace(1, 81, 81, dtype=np.int32)
+    npart_mask = np.linspace(1, 69, 69, dtype=np.int32)
+    coords_none = {'npart': (['npart'], npart_none)}
+    coords_mask = {'npart': (['npart'], npart_mask)}
+    ds1d_none = xr.Dataset(data_vars=data_vars_none, coords=coords_none)
+    ds1d_mask = xr.Dataset(data_vars=data_vars_mask, coords=coords_mask)
+    da1d_none = ds1d_none['test_01']
+    da1d_mask = ds1d_mask['test_01']
+    # starts testing
+    test_none = (fs_none, da1d_none, ds1d_none)
+    test_mask = (fs_mask, da1d_mask, ds1d_mask)
+    test_list = [test_none, test_mask]
+    for fs, da1d, ds1d in test_list:
+        fs.get_rectmesh()
+        # method test
+        da2d = fs.npart_to_2D_array(da1d)
+        ds2d = fs.npart_to_2D_array(ds1d)
+        # shape test
+        assert da2d.to_array().values.shape == (1, fs.Ny, fs.Nx)
+        assert ds2d.to_array().values.shape == (3, fs.Ny, fs.Nx)
+        # coordinates test
+        assert list(da2d.lon.values) == list(fs.x)
+        assert list(da2d.lat.values) == list(fs.y)
+        assert list(ds2d.lon.values) == list(fs.x)
+        assert list(ds2d.lat.values) == list(fs.y)
+        # mask test
+        if fs.model_grid is not None:
+            mask1d = fs.ocean_bools
+            mask2d_da = (np.isnan(da2d.to_array().values[0])==False).ravel()
+            np.testing.assert_allclose(mask2d_da, mask1d)
+            for i in range(3):
+                mask2d_ds = (np.isnan(ds2d.to_array().values[i])==False).ravel()
+                np.testing.assert_allclose(mask2d_ds, mask1d)
 
 
 # Nathaniel's example
