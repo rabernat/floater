@@ -227,10 +227,10 @@ def test_npart_to_2D_array():
         assert da2d.to_array().values.shape == (1, fs.Ny, fs.Nx)
         assert ds2d.to_array().values.shape == (3, fs.Ny, fs.Nx)
         # coordinates test
-        assert list(da2d.lon.values) == list(fs.x)
-        assert list(da2d.lat.values) == list(fs.y)
-        assert list(ds2d.lon.values) == list(fs.x)
-        assert list(ds2d.lat.values) == list(fs.y)
+        np.testing.assert_allclose(da2d.lon.values, fs.x)
+        np.testing.assert_allclose(da2d.lat.values, fs.y)
+        np.testing.assert_allclose(ds2d.lon.values, fs.x)
+        np.testing.assert_allclose(ds2d.lat.values, fs.y)
         # mask test
         if fs.model_grid is not None:
             mask1d = fs.ocean_bools
