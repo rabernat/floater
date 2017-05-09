@@ -262,7 +262,7 @@ def convex_contour_around_maximum(data, ji, step, border=5,
         else:
             contour_proj = project_vertices(contour, **proj_kwargs)
 
-        region_area, hull_area, cd = contour_area(contour)
+        region_area, hull_area, cd = contour_area(contour_proj)
         if verbose:
             print('  region_area: % 6.1f, hull_area: % 6.1f, convex_def: % 6.5e'
                   % (region_area, hull_area, cd))
