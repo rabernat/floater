@@ -168,14 +168,18 @@ def test_convex_contour_around_maximum_projected(sample_data_and_maximum,
     proj_kwargs = dict(
         dlon=lon[1] - lon[0],
         dlat=lat[1] - lat[0],
-        lon0=lon.mean(),
-        lat0=lat.mean(),
+        lon0=lon[ji[1]],
+        lat0=lat[ji[0]],
     )
 
     # step determines how precise the contour identification is
     step = 0.001
     con, area = rclv.convex_contour_around_maximum(psi, ji, step,
                                 proj_kwargs=proj_kwargs)
+
+    # check against reference solution
+    np.testing.assert_allclose(area, 2375686527)
+    assert len(con) == 261
 
 
 
@@ -195,3 +199,21 @@ def test_find_convex_contours(sample_data_and_maximum):
     assert labels.max() == 1
     assert labels.min() == 0
     assert labels.sum() == 2693
+
+
+def test_find_convex_contours_projected(sample_data_and_maximum,
+                                        sample_data_lon_lat):
+    psi, ji, psi_max = sample_data_and_maximum
+    lon, lat = sample_data_lon_lat
+
+    with pytest.raises(ValueError):
+        _ = list(rclv.find_convex_contours(psi, step=0.001, lon=lon[1:], lat=lat))
+
+    res = list(rclv.find_convex_contours(psi, step=0.001, lon=lon, lat=lat))
+
+    assert len(res) == 1
+
+    ji_found, con, area = res[0]
+    assert tuple(ji_found) == ji
+    assert len(con) == 261
+    np.testing.assert_allclose(area, 2375686527)

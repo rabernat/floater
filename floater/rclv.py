@@ -288,7 +288,7 @@ def convex_contour_around_maximum(data, ji, step, border=5,
 def find_convex_contours(data, min_distance=5, min_area=100.,
                              max_footprint=10000,
                              step=1e-7, convex_def=0.001, verbose=False,
-                             use_threadpool=False):
+                             use_threadpool=False, lon=None, lat=None):
     """Find the outermost convex contours around the maxima of
     data with specified convexity deficiency.
 
@@ -299,20 +299,23 @@ def find_convex_contours(data, min_distance=5, min_area=100.,
     min_distance : int, optional
         The minimum distance around maxima
     min_area : float, optional
-        The minimum area of the regions
-    max_footprint: int, optional
-        The maximum area of the footprint in which to search for contours
+        The minimum area of the regions (pixels or projected if `lon` and `lat`
+        are specified)
+    max_footprint : int, optional
+        The maximum area (in pixels) of the footprint in which to search for
+        contours
     step : float, optional
         the step size with which to increment the contour level
     convex_def : float, optional
         The maximum convexity deficiency allowed for the contour
         before the seach stops.
-    verbose: bool, optional
+    verbose : bool, optional
         Whether to print out diagnostic information
     use_threadpool : bool, optional
         Whether to map each maximum using a multiprocessing.ThreadPool
-    progress: bool, optional
-        Whether to show a progress bar for the iteration through maxima
+    lon, lat : arraylike
+        Longitude and latitude of data points. Should be 1D arrays such that
+        ``len(lon) == data.shape[1]`` and ``len(lat) == data.shape[0]``
 
     Yields
     -------
@@ -320,8 +323,23 @@ def find_convex_contours(data, min_distance=5, min_area=100.,
         2D array of contour vertices with shape (N,2) that follows
         the scikit image conventions (contour[:,0] are j indices)
     area : float
-        The area enclosed by the contour
+        The area enclosed by the contour (in pixels or projected if
+        `lon` and `lat` are specified)
     """
+
+    # do some checks on the coordinates if they are specified
+    if (lon is not None) or (lat is not None):
+        if not ((len(lat) == data.shape[0]) and (len(lon) == data.shape[1])):
+            raise ValueError('`lon` or `lat` have the incorrect length')
+        dlon = lon[1] - lon[0]
+        dlat = lat[1] - lat[0]
+        # make sure that the lon and lat are evenly spaced
+        if not (np.allclose(np.diff(lon), dlon) and
+                np.allclose(np.diff(lat), dlat)):
+            raise ValueError('`lon` and `lat` need to be evenly spaced')
+        proj = True
+    else:
+        proj = False
 
     if use_threadpool:
         from multiprocessing.pool import ThreadPool
@@ -342,11 +360,14 @@ def find_convex_contours(data, min_distance=5, min_area=100.,
         tic = time()
         result = None
         if data[tuple(ji)] > step:
-            # only makes sense to look for contours is the value of the maximum
+            # only makes sense to look for contours if the value of the maximum
             # is greater than the contour step size
+            proj_kwargs = {'lon0': lon[ji[1]], 'lat0': lat[ji[0]],
+                               'dlon': dlon, 'dlat': dlat} if proj else None
+
             contour, area = convex_contour_around_maximum(data, ji, step,
                 border=min_distance, convex_def=convex_def, verbose=verbose,
-                max_footprint=max_footprint)
+                max_footprint=max_footprint, proj_kwargs=proj_kwargs)
             if area and (area >= min_area):
                 result = ji, contour, area
         toc = time()
