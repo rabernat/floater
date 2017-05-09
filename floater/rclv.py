@@ -9,6 +9,8 @@ from scipy.spatial import qhull
 from tqdm import tqdm
 from time import time
 
+R_earth = 6.371e6
+
 def polygon_area(verts):
     """Compute the area of a polygon.
 
@@ -27,7 +29,8 @@ def polygon_area(verts):
     # use scikit image convetions (j,i indexing)
     area_elements = ((verts_roll[:,1] + verts[:,1]) *
                      (verts_roll[:,0] - verts[:,0]))
-    return area_elements.sum()/2.0
+    # absolute value makes results independent of orientation
+    return abs(area_elements.sum())/2.0
 
 
 def get_local_region(data, ji, border_j, border_i):
@@ -75,7 +78,7 @@ def contour_area(con):
     con_points = con[:,::-1]
 
     # calculate area of polygon
-    region_area = abs(polygon_area(con_points))
+    region_area = polygon_area(con_points)
 
     # find convex hull
     hull = qhull.ConvexHull(con_points)
@@ -87,8 +90,42 @@ def contour_area(con):
     return region_area, hull_area, cd
 
 
+def project_vertices(verts, lon0, lat0, dlon, dlat):
+    """Project the logical coordinates of vertices into physical map
+    coordiantes.
+
+    Parameters
+    ----------
+    verts : arraylike
+        A 2D array of vertices with shape (N,2) that follows the scikit
+        image conventions (con[:,0] are j indices)
+    lon0, lat0 : float
+        center lon and lat for the projection
+    dlon, dlat : float
+        spacing of points in longitude
+    dlat : float
+        spacing of points in latitude
+
+    Returns
+    -------
+    verts_proj : arraylike
+        A 2D array of projected vertices with shape (N,2) that follows the
+        scikit image conventions (con[:,0] are j indices)
+    """
+
+    i, j = verts[:, 1], verts[:, 0]
+
+    # use the simplest local tangent plane projection
+    dy = (np.pi * R_earth / 180.)
+    dx = dy * np.cos(np.radians(lat0))
+    x = dx * dlon *i
+    y = dy * dlat * j
+
+    return np.vstack([y, x]).T
+
+
 def find_contour_around_maximum(data, ji, level, border_j=(5,5),
-        border_i=(5,5), max_footprint=None):
+        border_i=(5,5), max_footprint=None, proj_kwargs={}):
     j,i = ji
     max_val = data[j,i]
 
@@ -155,7 +192,7 @@ def find_contour_around_maximum(data, ji, level, border_j=(5,5),
 
 def convex_contour_around_maximum(data, ji, step, border=5,
                                   convex_def=0.01, verbose=False,
-                                  max_footprint=None):
+                                  max_footprint=None, proj_kwargs=None):
     """Find the largest convex contour around a maximum.
 
     Parameters
@@ -173,6 +210,9 @@ def convex_contour_around_maximum(data, ji, step, border=5,
         before the seach stops.
     verbose: bool, optional
         Whether to print out diagnostic information
+    proj_kwargs: dict, optional
+        Information for projecting the contour into spatial coordinates. Should
+        contain entries `lon0`, `lat0`, `dlon`, and `dlat`.
 
     Returns
     -------
@@ -217,9 +257,14 @@ def convex_contour_around_maximum(data, ji, step, border=5,
             break
 
         # get the convexity deficiency
+        if proj_kwargs is None:
+            contour_proj = contour
+        else:
+            contour_proj = project_vertices(contour, **proj_kwargs)
+
         region_area, hull_area, cd = contour_area(contour)
         if verbose:
-            print('  region_area: % 6.1f, hull_area: % 6.1f, convex_def: % 6.5e '
+            print('  region_area: % 6.1f, hull_area: % 6.1f, convex_def: % 6.5e'
                   % (region_area, hull_area, cd))
 
         if cd > convex_def:
