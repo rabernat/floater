@@ -18,14 +18,26 @@ parser.set_defaults(progress=False)
 parser.add_argument('--input_dir', default='./', metavar='DIR',
                    help='directory in which to find the MITgcm float data')
 
-parser.add_argument('--output_format', choices=['pytables','bcolz','pandas'],
+parser.add_argument('--output_format', choices=['pytables','bcolz','pandas','netcdf'],
                     default='pytables', metavar='FMT',
                     help="output format of conversion "
-                         "('pytables', 'bcolz', or 'pandas')")
+                         "('pytables', 'bcolz', 'pandas', or 'netcdf')")
 
 parser.add_argument('--keep_fields', type=str,
                     default=None, metavar='FIELDS',
                     help="comma-dilimited list of data fields to retain")
+
+parser.add_argument('--output_dir', default='./', metavar='OD',
+                    help='directory in which to store the transcoded float files')
+
+parser.add_argument('--output_prefix', default='float_trajectories', metavar='OP',
+                    help='prefix of the transcoded float filenames')
+
+parser.add_argument('--ref_time', default=None, metavar='RT',
+                    help='reference time, format: YYYY-MM-DD')
+
+parser.add_argument('--step_time', default=86400, metavar='ST',
+                    help='step time, unit: second')
 
 parser.add_argument('output_file',
                    help='the output filename')
@@ -36,7 +48,7 @@ if args.keep_fields is not None:
     keep_fields = [str(item) for item in args.keep_fields.split(',')]
 else:
     keep_fields = None
-    
+
 if args.output_format=='pytables':
     utils.floats_to_tables(args.input_dir, args.output_file,
                         float_file_prefix=args.float_file_prefix,
@@ -55,3 +67,10 @@ elif args.output_format=='pandas':
                         buf_dim=args.float_buf_dim,
 			            progress=args.progress,
                         keep_fields=keep_fields)
+elif args.output_format=='netcdf':
+    utils.floats_to_netcdf(args.input_dir, args.output_file,
+                        float_file_prefix=args.float_file_prefix,
+                        ref_time=args.ref_time,
+                        step_time=args.step_time,
+                        output_dir=args.output_dir,
+                        output_prefix=args.output_prefix)

@@ -218,3 +218,63 @@ def floats_to_castra(input_dir, output_fname, progress=False, **kwargs):
         if not c:
             c = Castra(output_fname, template=df)
         c.extend(df)
+
+def floats_to_netcdf(input_dir, output_fname,
+                     float_file_prefix='float_trajectories',
+                     ref_time=None, step_time=86400, output_dir='./',
+                     output_prefix='float_trajectories'):
+    """Convert MITgcm float data to NetCDF format.
+
+    Parameters
+    ----------
+    input_dir : path
+        Where to find the MITgcm output data
+    output_fname : path
+        Filename of the NetCDF data store
+    float_file_prefix: str
+        Prefix of MITgcm output files
+    ref_time: str
+        Reference time, format: YYYY-MM-DD
+    step_time: int
+        Step time, unit: second
+    output_dir: path
+        Where to store the transcoded NetCDF files
+    output_prefix: str
+        Prefix of the transcoded NetCDF files
+    """
+    import dask.dataframe as dd
+    import xarray as xr
+    from glob import glob
+
+    output_fname = _maybe_add_suffix(output_fname, '_netcdf')
+
+    float_files = glob(float_file_prefix+'.*.csv')
+    float_digits = 10
+    step_code = len(float_file_prefix) + float_digits + 1
+    float_timesteps = sorted(list({float_file[:step_code] for float_file in float_files}))
+
+    float_columns = ['npart', 'time', 'x', 'y', 'z', 'u', 'v', 'vort']
+    var_names = float_columns[2:]
+
+    for float_timestep in float_timesteps:
+        input_path = input_dir + float_timestep + '.*.csv'
+        df = dd.read_csv(input_path, names=float_columns, header=None)
+        dfc = df.compute()
+        dfcs = dfc.sort_values('npart')
+        step_time = int(step_time)
+        step_num = int(dfcs.time.values[0])//step_time
+        if ref_time is not None:
+            ref_time = np.datetime64(ref_time, 'ns')
+            del_time = np.timedelta64(step_time*step_num, 's')
+            time = np.array([ref_time+del_time])
+        else:
+            time = np.array([np.int32(step_num)])
+        npart = dfcs.npart.values.astype(np.int32)
+        var_shape = (1, len(npart))
+        data_vars = {var_name: (['time', 'npart'], dfcs[var_name].values.astype(np.float32).reshape(var_shape)) for var_name in var_names}
+        ds = xr.Dataset(data_vars, coords={'time': time, 'npart': npart})
+        output_path = output_dir + output_fname + '/'
+        if not os.path.exists(output_path):
+            os.makedirs(output_path)
+        output_nc = output_path + output_prefix + float_timestep[-(float_digits+1):] + '.nc'
+        ds.to_netcdf(output_nc)

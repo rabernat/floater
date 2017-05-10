@@ -3,7 +3,9 @@
 from __future__ import print_function
 
 import numpy as np
+import pandas as pd
 import pickle
+import xarray as xr
 from scipy.spatial import cKDTree
 
 
@@ -93,7 +95,7 @@ class FloatSet(object):
 
         xx, yy = np.meshgrid(self.x, self.y)
         if self.model_grid is not None:
-            xx, yy = _subset_floats_from_mask(xx, yy, self.model_grid)
+            xx, yy = self.subset_floats_from_mask(xx, yy)
         return xx, yy
 
 
@@ -108,13 +110,13 @@ class FloatSet(object):
             2D array of float y coordinates
         """
 
-        xx, yy = np.meshgrid(self.x, self.y)
+        xx, yy = self.get_rectmesh()
         # modify to be even-R horizontal offset
         xx[::2] += self.dx/4
         xx[1::2] -= self.dx/4
 
         if self.model_grid is not None:
-            xx, yy = _subset_floats_from_mask(xx, yy, self.model_grid)
+            xx, yy = self.subset_floats_from_mask(xx, yy)
         return xx, yy
 
 
@@ -184,11 +186,12 @@ class FloatSet(object):
             xx, yy = self.get_hexmesh()
         else:
             xx, yy = self.get_rectmesh()
+        myx = xx
 
         ini_times = 1
 
         # initial positions
-        lon = xx.ravel()
+        lon = myx.ravel()
         lat = yy.ravel()
 
         # other float properties
@@ -216,8 +219,9 @@ class FloatSet(object):
         # which was was wrong for masked cases
         N = len(lon)
 
+        output_dtype = np.dtype(dtype)
         # for all the float data
-        flt_matrix = np.zeros((N+1,9), dtype=dtype)
+        flt_matrix = np.zeros((N+1,9), dtype=output_dtype)
 
         flt_matrix[1:,0] = np.arange(N)+1
         flt_matrix[1:,1] = tstart
@@ -258,7 +262,7 @@ class FloatSet(object):
             The filename to save the floatset data in
             (e.g. 'floatset.pkl')
         """
-        
+
         with open(filename, 'wb') as file:
             pickle.dump(self, file, -1)
 
@@ -271,61 +275,104 @@ class FloatSet(object):
             The filename to load in the saved floatset data from
             (e.g. 'floatset.pkl')
         """
-
+        self.ocean_bools = None #instantiate bef. updating
         with open(filename, 'rb') as file:
             self.__dict__.update(pickle.load(file).__dict__)
 
 
 
-def _subset_floats_from_mask(xx, yy, model_grid):
-    """Eliminate float positions that are on land land mask.
+    def subset_floats_from_mask(self, xx, yy):
+        """Eliminate float positions that are on land land mask.
 
-    PARAMETERS
-    ----------
-    xx : arraylike
-        float longitudes
-    yy : arraylike
-        float latitudes
-    model_grid : dictionary
-        the following key value pairs are expected
-            'land_mask': np.ndarray of bools
-                2d array of dimensions in C order: shape==(len(lat), len(lon))
-                An element is True iff the corresponding tracer cell grid point
-                is unmasked (ocean)
-            'lon': 1d array of the mask grid longitudes
-            'lat': 1d array of the mask grid latitudes
+        PARAMETERS
+        ----------
+        xx : arraylike
+            float longitudes
+        yy : arraylike
+            float latitudes
+        model_grid : dictionary
+            the following key value pairs are expected
+                'land_mask': np.ndarray of bools
+                    2d array of dimensions in C order: shape==(len(lat), len(lon))
+                    An element is True iff the corresponding tracer cell grid point
+                    is unmasked (ocean)
+                'lon': 1d array of the mask grid longitudes
+                'lat': 1d array of the mask grid latitudes
 
-    RETURNS
-    -------
-    xx_masked, yy_masked: np.ndarray
-        1D arrays of float coordinates subarrays:
-    """
+        RETURNS
+        -------
+        xx_masked, yy_masked: np.ndarray
+            1D arrays of float coordinates subarrays:
+        """
 
-    xx = xx.ravel()
-    yy = yy.ravel()
+        xx = xx.ravel()
+        yy = yy.ravel()
 
-    mask_lon = model_grid['lon']
-    mask_lat = model_grid['lat']
-    land_mask = model_grid['land_mask']
-    # we require the array to be using using C order
-    assert land_mask.shape == (len(mask_lat), len(mask_lon))
+        mask_lon = self.model_grid['lon']
+        mask_lat = self.model_grid['lat']
+        land_mask = self.model_grid['land_mask']
+        # we require the array to be using using C order
+        assert land_mask.shape == (len(mask_lat), len(mask_lon))
 
-    # fast cartesian product
-    mask_geo = np.dstack(np.meshgrid(mask_lon, mask_lat))
-    mask_geo = mask_geo.reshape(-1, 2)
+        # fast cartesian product
+        mask_geo = np.dstack(np.meshgrid(mask_lon, mask_lat))
+        mask_geo = mask_geo.reshape(-1, 2)
 
-    mask_bool_flat = land_mask.ravel()
-    mask_xyz = geo_to_xyz(mask_geo)
-    # a KDTree of the mask data in xyz form
-    mask_tree = cKDTree(mask_xyz)
-    floats_geo = np.transpose([xx.ravel(), yy.ravel()])
-    # uniform hexagonal tiling
-    queries_xyz = geo_to_xyz(floats_geo)
-    # search for nearest neighbors
-    dist, neighbor_indices = mask_tree.query(queries_xyz, n_jobs=-1)
-    ocean_bools = np.take(mask_bool_flat, neighbor_indices.ravel()) # True -> neighbor is tracer ocean
-    floats_ocean = floats_geo[np.nonzero(ocean_bools.astype('int'))].T
+        mask_bool_flat = land_mask.ravel()
+        mask_xyz = geo_to_xyz(mask_geo)
+        # a KDTree of the mask data in xyz form
+        mask_tree = cKDTree(mask_xyz)
+        floats_geo = np.transpose([xx.ravel(), yy.ravel()])
+        # uniform hexagonal tiling
+        queries_xyz = geo_to_xyz(floats_geo)
+        # search for nearest neighbors
+        dist, neighbor_indices = mask_tree.query(queries_xyz, n_jobs=-1)
+        self.ocean_bools = np.take(mask_bool_flat, neighbor_indices.ravel()) # True -> neighbor is tracer ocean
+        floats_ocean = floats_geo[np.nonzero(self.ocean_bools.astype('int'))].T
 
-    return floats_ocean
+        return floats_ocean
 
 
+    def npart_to_2D_array(self, ds1d):
+        """Constructs 2D Dataset from 1D DataArray/DataSet of single or multi-variable.
+
+        PARAMETERS
+        ----------
+        ds1d : 1D DataArray/Dataset
+            One-dimensional dataarray/dataset of physical variable(s) with dimension 'npart'
+
+        RETURNS
+        -------
+        ds2d : 2D Dataset
+            Two-dimensional dataset of physical variable(s) with dimensions 'lat' and 'lon'
+        """
+
+        Nx = self.Nx
+        Ny = self.Ny
+        Nt = Nx*Ny
+        if type(ds1d) == xr.core.dataarray.DataArray:
+            ds1d = ds1d.to_dataset()
+        df = ds1d.to_dataframe()
+        var_list = list(df)
+        index_dict = {'index': range(1, Nt+1)}
+        var_dict = {var: np.zeros(Nt) for var in var_list}
+        frame_dict = {}
+        frame_dict.update(index_dict)
+        frame_dict.update(var_dict)
+        frame = pd.DataFrame(frame_dict)
+        framei = frame.set_index('index')
+        if self.model_grid is not None:
+            ocean_bools = self.ocean_bools
+        else:
+            ocean_bools = np.zeros(Nt, dtype=bool)==False
+        framei.loc[ocean_bools==True] = df.values.astype(np.float32)
+        framei.loc[ocean_bools==False] = np.float32('nan')
+        data_vars = {}
+        for var in var_list:
+            frameir = framei[var].values.reshape(Ny, Nx)
+            data_vars.update({var: (['lat', 'lon'], frameir)})
+        lon = np.float32(self.x)
+        lat = np.float32(self.y)
+        coords = {'lat': (['lat'], lat), 'lon': (['lon'], lon)}
+        ds2d = xr.Dataset(data_vars=data_vars, coords=coords)
+        return ds2d
