@@ -490,20 +490,41 @@ def label_points_in_contours(shape, contours):
     """
 
     assert len(shape)==2
-
-    data = np.zeros(shape, dtype='i4')
+    ny, nx = shape
 
     # modify data in place with this function
-    def fill_in_contour(contour, value=1):
+    def fill_in_contour(contour, label_data, value=1):
         ymin, xmin = (np.floor(contour.min(axis=0)) - 1).astype('int')
         ymax, xmax = (np.ceil(contour.max(axis=0)) + 1).astype('int')
+        print(((ymin, ymax), (xmin, xmax)))
+        # possibly roll the data to deal with periodicity
+        roll_x, roll_y = 0, 0
+        if ymin < 0:
+            roll_y = -ymin
+        if ymax > ny:
+            roll_y = ny - ymax
+        if xmin < 0:
+            roll_x = -xmin
+        if xmax > nx:
+            roll_x = nx - xmax
+
+        contour_rel = contour - np.array([ymin, xmin])
+
+        ymax += roll_y
+        ymin += roll_y
+        xmax += roll_x
+        xmin += roll_x
+
+        data = np.roll(np.roll(label_data, roll_x, axis=1), roll_y, axis=0)
         region_slice = (slice(ymin,ymax), slice(xmin,xmax))
         region_data = data[region_slice]
-        contour_rel = contour - np.array([ymin, xmin])
         data[region_slice] = value*grid_points_in_poly(region_data.shape,
                                                        contour_rel)
 
-    for n, con in enumerate(contours):
-        fill_in_contour(con, n+1)
+        return np.roll(np.roll(data, -roll_x, axis=1), -roll_y, axis=0)
 
-    return data
+    labels = np.zeros(shape, dtype='i4')
+    for n, con in enumerate(contours):
+        labels = fill_in_contour(con, labels, n+1)
+
+    return labels
