@@ -314,7 +314,9 @@ def test_find_convex_contours_periodic(sample_data_and_maximum):
     np.testing.assert_allclose(area, 2693.8731123245125)
 
     # also test the "filling in" function
-    labels = rclv.label_points_in_contours(psi.shape, [con])
-    assert labels.max() == 1
+    all_cons = [r[1] for r in res]
+    labels = rclv.label_points_in_contours(psi.shape, all_cons)
+    assert labels.max() == 2
     assert labels.min() == 0
-    assert labels.sum() == 2693
+    assert (labels==1).sum() == 163
+    assert (labels==2).sum() == 2693
