@@ -291,3 +291,24 @@ def test_find_convex_contours_projected(sample_data_and_maximum,
     assert tuple(ji_found) == ji
     assert len(con) == 261
     np.testing.assert_allclose(area, 2375686527)
+
+
+def test_find_convex_contours_periodic(sample_data_and_maximum):
+    psi, ji, psi_max = sample_data_and_maximum
+
+    j, i = ji
+    # shift everything left by some amount
+    roll_i = 40
+    data_rolled = np.roll(psi, -roll_i, axis=1)
+    ji_rolled = ji = (50, 45 - roll_i)
+    periodic = (False, True)
+
+    res = list(rclv.find_convex_contours(data_rolled, step=0.001, periodic=periodic))
+
+    # now we get two contours
+    assert len(res) == 2
+
+    ji_found, con, area = res[1]
+    assert tuple(ji_found) == ji_rolled
+    assert len(con) == 261
+    np.testing.assert_allclose(area, 2693.8731123245125)

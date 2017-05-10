@@ -52,8 +52,6 @@ def get_local_region(data, ji, border_j, border_i, periodic=(False, False)):
     concat_left = (imin < 0)
     concat_right = (imax > ni)
 
-    print((concat_down, concat_up, concat_left, concat_right))
-
     # check for valid region limits
     if (concat_left or concat_right) and not periodic[1]:
         raise ValueError("Region i-axis limits " + repr((imin, imax)) +
@@ -206,7 +204,8 @@ def project_vertices(verts, lon0, lat0, dlon, dlat):
 
 
 def find_contour_around_maximum(data, ji, level, border_j=(5,5),
-        border_i=(5,5), max_footprint=None, proj_kwargs={}):
+        border_i=(5,5), max_footprint=None, proj_kwargs={},
+        periodic=(False, False)):
     j,i = ji
     max_val = data[j,i]
 
@@ -235,7 +234,9 @@ def find_contour_around_maximum(data, ji, level, border_j=(5,5),
         # TODO: define a max_area flag to know when to stop growing
 
         # find the local region
-        (j_rel, i_rel), region_data = get_local_region(data, (j,i), border_j, border_i)
+        (j_rel, i_rel), region_data = get_local_region(data, (j,i),
+                                                       border_j, border_i,
+                                                       periodic=periodic)
         nj, ni = region_data.shape
 
         # extract the contours
@@ -273,7 +274,8 @@ def find_contour_around_maximum(data, ji, level, border_j=(5,5),
 
 def convex_contour_around_maximum(data, ji, step, border=5,
                                   convex_def=0.01, verbose=False,
-                                  max_footprint=None, proj_kwargs=None):
+                                  max_footprint=None, proj_kwargs=None,
+                                  periodic=(False, False)):
     """Find the largest convex contour around a maximum.
 
     Parameters
@@ -289,11 +291,14 @@ def convex_contour_around_maximum(data, ji, step, border=5,
     convex_def : float, optional
         The maximum convexity deficiency allowed for the contour
         before the seach stops.
-    verbose: bool, optional
+    verbose : bool, optional
         Whether to print out diagnostic information
-    proj_kwargs: dict, optional
+    proj_kwargs : dict, optional
         Information for projecting the contour into spatial coordinates. Should
         contain entries `lon0`, `lat0`, `dlon`, and `dlat`.
+    periodic : tuple
+        Tuple of bools which specificies the periodicity of each axis (j, i) of
+        the data
 
     Returns
     -------
@@ -331,7 +336,7 @@ def convex_contour_around_maximum(data, ji, step, border=5,
             # try to get a contour
             contour, region_data, border_j, border_i = find_contour_around_maximum(
                 data, (j,i), level, border_j, border_i,
-                max_footprint=max_footprint)
+                max_footprint=max_footprint, periodic=periodic)
         except ValueError as ve:
             if verbose:
                 print(ve)
@@ -369,7 +374,8 @@ def convex_contour_around_maximum(data, ji, step, border=5,
 def find_convex_contours(data, min_distance=5, min_area=100.,
                              max_footprint=10000,
                              step=1e-7, convex_def=0.001, verbose=False,
-                             use_threadpool=False, lon=None, lat=None):
+                             use_threadpool=False, lon=None, lat=None,
+                             periodic=(False, False)):
     """Find the outermost convex contours around the maxima of
     data with specified convexity deficiency.
 
@@ -397,6 +403,9 @@ def find_convex_contours(data, min_distance=5, min_area=100.,
     lon, lat : arraylike
         Longitude and latitude of data points. Should be 1D arrays such that
         ``len(lon) == data.shape[1]`` and ``len(lat) == data.shape[0]``
+    periodic : tuple
+        Tuple of bools which specificies the periodicity of each axis (j, i) of
+        the data
 
     Yields
     -------
@@ -448,7 +457,8 @@ def find_convex_contours(data, min_distance=5, min_area=100.,
 
             contour, area = convex_contour_around_maximum(data, ji, step,
                 border=min_distance, convex_def=convex_def, verbose=verbose,
-                max_footprint=max_footprint, proj_kwargs=proj_kwargs)
+                max_footprint=max_footprint, proj_kwargs=proj_kwargs,
+                periodic=periodic)
             if area and (area >= min_area):
                 result = ji, contour, area
         toc = time()
