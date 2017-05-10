@@ -33,7 +33,7 @@ def polygon_area(verts):
     return abs(area_elements.sum())/2.0
 
 
-def get_local_region(data, ji, border_j, border_i):
+def get_local_region(data, ji, border_j, border_i, periodic=(False, False)):
     #print("get_local_region " + repr(ji) + repr(border_i) + repr(border_j))
     j, i = ji
     nj, ni = data.shape
@@ -42,11 +42,92 @@ def get_local_region(data, ji, border_j, border_i):
     imin = i - border_i[0]
     imax = i + border_i[1] + 1
 
-    if (jmin < 0) or (imin < 0) or (jmax >= nj) or (imax >= ni):
-        raise ValueError("Limits " + repr(((jmin, jmax), (imin, imax))) +
-                         " outside of array shape " + repr((nj,ni)))
+    # we could easily implement wrapping with take
+    # https://docs.scipy.org/doc/numpy/reference/generated/numpy.take.html
+    # unfortunately, take is ~1000000 times slower than raw indexing and copies
+    # the data. So we need to slice and concatenate
 
-    return (j - jmin, i - imin), data[j,i] - data[jmin:jmax, imin:imax]
+    concat_down = (jmin < 0)
+    concat_up = (jmax > nj)
+    concat_left = (imin < 0)
+    concat_right = (imax > ni)
+
+    print((concat_down, concat_up, concat_left, concat_right))
+
+    # check for valid region limits
+    if (concat_left or concat_right) and not periodic[1]:
+        raise ValueError("Region i-axis limits " + repr((imin, imax)) +
+                         " outside of array shape " + repr((nj,ni)) +
+                         " and i-axis is not periodic")
+    if (concat_up or concat_down) and not periodic[0]:
+        raise ValueError("Region j-axis limits " + repr((jmin, jmax)) +
+                         " outside of array shape " + repr((nj,ni)) +
+                         " and j-axis is not periodic")
+    if (concat_left and concat_right) or (concat_up and concat_down):
+        raise ValueError("Can't concatenate on more than one side on the same "
+                         "axis. Limits are " +
+                         repr(((jmin, jmax), (imin, imax))))
+
+    # limits for central region
+    imin_reg = max(imin, 0)
+    imax_reg = min(imax, ni)
+    jmin_reg = max(jmin, 0)
+    jmax_reg = min(jmax, nj)
+    data_center = data[jmin_reg:jmax_reg, imin_reg:imax_reg]
+
+    if concat_down:
+        data_down = data[jmin:, imin_reg:imax_reg]
+    if concat_up:
+        data_up = data[:(jmax - nj), imin_reg:imax_reg]
+    if concat_left:
+        data_left= data[jmin_reg:jmax_reg, imin:]
+    if concat_right:
+        data_right = data[jmin_reg:jmax_reg, :(imax - ni)]
+
+    # corner cases
+    if concat_down and concat_left:
+        data_down_left = data[jmin:, imin:]
+    if concat_down and concat_right:
+        data_down_right = data[jmin:, :(imax - ni)]
+    if concat_up and concat_left:
+        data_up_left = data[:(jmax - nj), imin:]
+    if concat_up and concat_right:
+        data_up_right = data[:(jmax - nj), :(imax - ni)]
+
+    # now put things together, starting with the corner cases
+    # it feels like there must be a more elegant way to do this
+    if concat_down and concat_left:
+        data_reg = np.concatenate(
+                        (np.concatenate((data_down_left, data_down), axis=1),
+                         np.concatenate((data_left, data_center), axis=1)),
+                        axis=0)
+    elif concat_down and concat_right:
+        data_reg = np.concatenate(
+                        (np.concatenate((data_down, data_down_right), axis=1),
+                         np.concatenate((data_center, data_right), axis=1)),
+                        axis=0)
+    elif concat_up and concat_left:
+        data_reg = np.concatenate(
+                        (np.concatenate((data_left, data_center), axis=1),
+                         np.concatenate((data_up_left, data_up), axis=1)),
+                        axis=0)
+    elif concat_up and concat_right:
+        data_reg = np.concatenate(
+                        (np.concatenate((data_center, data_right), axis=1),
+                         np.concatenate((data_up, data_up_right), axis=1)),
+                        axis=0)
+    elif concat_down:
+        data_reg = np.concatenate((data_down, data_center), axis=0)
+    elif concat_up:
+        data_reg = np.concatenate((data_center, data_up), axis=0)
+    elif concat_left:
+        data_reg = np.concatenate((data_left, data_center), axis=1)
+    elif concat_right:
+        data_reg = np.concatenate((data_center, data_right), axis=1)
+    else:
+        data_reg = data_center
+
+    return (j - jmin, i - imin), data[j,i] - data_reg
 
 
 def is_contour_closed(con):

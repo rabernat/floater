@@ -83,12 +83,86 @@ def test_get_local_region():
     with pytest.raises(ValueError) as ve:
         (j,i), x_reg = rclv.get_local_region(x, (2,2), border_j=(3,2), border_i=(2,2))
     with pytest.raises(ValueError) as ve:
-        (j,i), x_reg = rclv.get_local_region(x, (2,2), border_j=(2,7), border_i=(2,2))
+        (j,i), x_reg = rclv.get_local_region(x, (2,2), border_j=(2,8), border_i=(2,2))
     with pytest.raises(ValueError) as ve:
         (j,i), x_reg = rclv.get_local_region(x, (2,2), border_j=(2,2), border_i=(3,2))
     with pytest.raises(ValueError) as ve:
-        (j,i), x_reg = rclv.get_local_region(x, (2,2), border_j=(2,2), border_i=(2,7))
+        (j,i), x_reg = rclv.get_local_region(x, (2,2), border_j=(2,2), border_i=(2,8))
 
+
+def test_get_local_region_periodic():
+    # create some data
+    n = 10
+    x, y = np.meshgrid(np.arange(n), np.arange(n))
+
+    # check behavior for periodic in the i direction
+    periodic=(False, True)
+    _, x_reg = rclv.get_local_region(x, (2, 1), periodic=periodic,
+                                          border_j=(2, 2), border_i=(2, 2))
+    assert x_reg.shape == (5, 5)
+    assert x_reg[0, 0] == -8
+    _, x_reg = rclv.get_local_region(x, (2, 8), periodic=periodic,
+                                          border_j=(2, 2), border_i=(2 ,2))
+    assert x_reg.shape == (5, 5)
+    assert x_reg[0, -1] == 8
+
+    # check behavior for periodic in the j direction
+    periodic=(True, False)
+    _, y_reg = rclv.get_local_region(y, (1, 2), periodic=periodic,
+                                          border_j=(2, 2), border_i=(2,2 ))
+    assert y_reg.shape == (5, 5)
+    assert y_reg[0, 0] == -8
+
+    _, y_reg = rclv.get_local_region(y, (8, 2), periodic=periodic,
+                                          border_j=(2, 2), border_i=(2, 2))
+    assert y_reg.shape == (5, 5)
+    assert y_reg[-1, 0] == 8
+
+    # check behavior for doubly periodic, all four corners
+    periodic = (True, True)
+    # lower left
+    ji = (1, 1)
+    _, y_reg = rclv.get_local_region(y, ji, periodic=periodic,
+                                              border_j=(2, 2), border_i=(2, 2))
+    _, x_reg = rclv.get_local_region(x, ji, periodic=periodic,
+                                              border_j=(2, 2), border_i=(2, 2))
+    assert x_reg.shape == (5, 5)
+    assert x_reg[0, 0] == -8
+    assert y_reg.shape == (5, 5)
+    assert y_reg[0, 0] == -8
+
+    # lower right
+    ji = (1, 8)
+    _, y_reg = rclv.get_local_region(y, ji, periodic=periodic,
+                                              border_j=(2, 2), border_i=(2, 2))
+    _, x_reg = rclv.get_local_region(x, ji, periodic=periodic,
+                                              border_j=(2, 2), border_i=(2, 2))
+    assert x_reg.shape == (5, 5)
+    assert x_reg[0, -1] == 8
+    assert y_reg.shape == (5, 5)
+    assert y_reg[0, 0] == -8
+
+    # upper left
+    ji = (8, 1)
+    _, y_reg = rclv.get_local_region(y, ji, periodic=periodic,
+                                              border_j=(2, 2), border_i=(2, 2))
+    _, x_reg = rclv.get_local_region(x, ji, periodic=periodic,
+                                              border_j=(2, 2), border_i=(2, 2))
+    assert x_reg.shape == (5, 5)
+    assert x_reg[0, 0] == -8
+    assert y_reg.shape == (5, 5)
+    assert y_reg[-1, 0] == 8
+
+    # upper right
+    ji = (8, 8)
+    _, y_reg = rclv.get_local_region(y, ji, periodic=periodic,
+                                              border_j=(2, 2), border_i=(2, 2))
+    _, x_reg = rclv.get_local_region(x, ji, periodic=periodic,
+                                              border_j=(2, 2), border_i=(2, 2))
+    assert x_reg.shape == (5, 5)
+    assert x_reg[0, -1] == 8
+    assert y_reg.shape == (5, 5)
+    assert y_reg[-1, 0] == 8
 
 def test_is_contour_closed(square_verts):
     assert rclv.is_contour_closed(square_verts)
