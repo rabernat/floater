@@ -528,3 +528,28 @@ def label_points_in_contours(shape, contours):
         labels = fill_in_contour(con, labels, n+1)
 
     return labels
+
+def contour_ji_to_geo(contour_ji, lon, lat):
+    """ converts a contour in ij pixel coordinates to lat/lon
+
+    Parameters
+    ---------------------
+    contour_ij: the list of vertices in (the LAVD image's) ij pixel coordinates
+    lon: 1-D array of grid longitudes
+    lat: 1-D array of gird latitudes
+
+    Returns
+    --------------------
+    contour_geo: the list of vertices in lat/lon coordinates
+    """
+
+    dlon = abs(abs(lon[1]) - abs(lon[0]))
+    dlat = abs(abs(lat[1]) - abs(lat[0]))
+
+    j,i  = countour_ji.T
+
+    x = lon[0] + dlon*i
+    y = lat[0] + dlat*j
+
+    contour_geo = np.array([x, y]).T
+    return contour_geo
