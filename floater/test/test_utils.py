@@ -102,7 +102,7 @@ def test_floats_to_netcdf(tmpdir, mitgcm_float_datadir_csv):
     # most options
     utils.floats_to_netcdf(input_dir=input_dir, output_fname='test',
                            float_file_prefix='float_trajectories',
-                           ref_time='1993-01-01', step_time='86400',
+                           ref_time='1993-01-01',
                            output_dir=output_dir, output_prefix='prefix_test')
 
     # filename prefix test
@@ -125,7 +125,7 @@ def test_floats_to_netcdf(tmpdir, mitgcm_float_datadir_csv):
         np.testing.assert_almost_equal(mfdm[var].values[0][0], value, 8)
 
     # times test
-    times = [(0, np.datetime64('1993-01-01', 'ns')), (1, np.datetime64('1993-01-02', 'ns'))]
-    for i, time in times:
-        assert mfdl['time'][i].values == i
+    times = [(0, 0, np.datetime64('1993-01-01', 'ns')), (1, 86400, np.datetime64('1993-01-02', 'ns'))]
+    for i, sec, time in times:
+        assert mfdl['time'][i].values == sec
         assert mfdm['time'][i].values == time

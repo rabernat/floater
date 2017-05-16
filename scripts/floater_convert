@@ -16,7 +16,7 @@ parser.add_argument('--progress', dest='progress', action='store_true')
 parser.set_defaults(progress=False)
 
 parser.add_argument('--input_dir', default='./', metavar='DIR',
-                   help='directory in which to find the MITgcm float data')
+                    help='directory in which to find the MITgcm float data')
 
 parser.add_argument('--output_format', choices=['pytables','bcolz','pandas','netcdf'],
                     default='pytables', metavar='FMT',
@@ -36,11 +36,8 @@ parser.add_argument('--output_prefix', default='float_trajectories', metavar='OP
 parser.add_argument('--ref_time', default=None, metavar='RT',
                     help='reference time, format: YYYY-MM-DD')
 
-parser.add_argument('--step_time', default=86400, metavar='ST',
-                    help='step time, unit: second')
-
 parser.add_argument('output_file',
-                   help='the output filename')
+                    help='the output filename')
 
 args = parser.parse_args()
 
@@ -71,6 +68,5 @@ elif args.output_format=='netcdf':
     utils.floats_to_netcdf(args.input_dir, args.output_file,
                         float_file_prefix=args.float_file_prefix,
                         ref_time=args.ref_time,
-                        step_time=args.step_time,
                         output_dir=args.output_dir,
                         output_prefix=args.output_prefix)

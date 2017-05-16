@@ -221,7 +221,7 @@ def floats_to_castra(input_dir, output_fname, progress=False, **kwargs):
 
 def floats_to_netcdf(input_dir, output_fname,
                      float_file_prefix='float_trajectories',
-                     ref_time=None, step_time=86400, output_dir='./',
+                     ref_time=None, output_dir='./',
                      output_prefix='float_trajectories'):
     """Convert MITgcm float data to NetCDF format.
 
@@ -231,15 +231,13 @@ def floats_to_netcdf(input_dir, output_fname,
         Where to find the MITgcm output data
     output_fname : path
         Filename of the NetCDF data store
-    float_file_prefix: str
+    float_file_prefix : str
         Prefix of MITgcm output files
-    ref_time: str
+    ref_time : str
         Reference time, format: YYYY-MM-DD
-    step_time: int
-        Step time, unit: second
-    output_dir: path
+    output_dir : path
         Where to store the transcoded NetCDF files
-    output_prefix: str
+    output_prefix : str
         Prefix of the transcoded NetCDF files
     """
     import dask.dataframe as dd
@@ -251,27 +249,23 @@ def floats_to_netcdf(input_dir, output_fname,
 
     match_pattern = float_file_prefix + '.*.csv'
     float_files = glob(os.path.join(input_dir, match_pattern))
-    float_digits = 10
-    step_code = len(float_file_prefix) + float_digits + 1
     float_timesteps = set(sorted([int(float_file[-22:-12]) for float_file in float_files]))
 
     float_columns = ['npart', 'time', 'x', 'y', 'z', 'u', 'v', 'vort']
     var_names = float_columns[2:]
 
     for float_timestep in tqdm(float_timesteps):
-        input_path = os.path.join(input_dir,
-                             '%s.%010d.*.csv' % (float_file_prefix, float_timestep))
+        input_path = os.path.join(input_dir, '%s.%010d.*.csv' % (float_file_prefix, float_timestep))
         df = dd.read_csv(input_path, names=float_columns, header=None)
         dfc = df.compute()
         dfcs = dfc.sort_values('npart')
-        step_time = int(step_time)
-        step_num = int(dfcs.time.values[0])//step_time
+        del_time = int(dfcs.time.values[0])
         if ref_time is not None:
             ref_time = np.datetime64(ref_time, 'ns')
-            del_time = np.timedelta64(step_time*step_num, 's')
+            del_time = np.timedelta64(del_time, 's')
             time = np.array([ref_time+del_time])
         else:
-            time = np.array([np.int32(step_num)])
+            time = np.array([np.int32(del_time)])
         npart = dfcs.npart.values.astype(np.int32)
         var_shape = (1, len(npart))
         data_vars = {var_name: (['time', 'npart'], dfcs[var_name].values.astype(np.float32).reshape(var_shape)) for var_name in var_names}
