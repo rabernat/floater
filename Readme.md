@@ -16,7 +16,7 @@ Transcoding is done via the `floater_convert` script, which is installed with th
 $ floater_convert
 usage: floater_convert [-h] [--float_file_prefix PREFIX] [--float_buf_dim N]
                        [--progress] [--input_dir DIR] [--output_format FMT]
-                       [--keep_fields FIELDS] [--ref_time RT]
+                       [--keep_fields FIELDS] [--ref_time RT] [--pkl_path PP]
                        [--output_dir OD] [--output_prefix OP]
                        output_file
 ```
