@@ -222,7 +222,8 @@ def floats_to_castra(input_dir, output_fname, progress=False, **kwargs):
 def floats_to_netcdf(input_dir, output_fname,
                      float_file_prefix='float_trajectories',
                      ref_time=None, output_dir='./',
-                     output_prefix='float_trajectories'):
+                     output_prefix='float_trajectories',
+                     pkl_path=None):
     """Convert MITgcm float data to NetCDF format.
 
     Parameters
@@ -242,6 +243,7 @@ def floats_to_netcdf(input_dir, output_fname,
     """
     import dask.dataframe as dd
     import xarray as xr
+    from floater.generators import FloatSet
     from glob import glob
     from tqdm import tqdm
 
@@ -270,6 +272,9 @@ def floats_to_netcdf(input_dir, output_fname,
         var_shape = (1, len(npart))
         data_vars = {var_name: (['time', 'npart'], dfcs[var_name].values.astype(np.float32).reshape(var_shape)) for var_name in var_names}
         ds = xr.Dataset(data_vars, coords={'time': time, 'npart': npart})
+        if pkl_path is not None:
+            fs = FloatSet(load_path=pkl_path)
+            ds = fs.npart_to_2D_array(ds)
         output_path = os.path.join(output_dir, output_fname)
         if not os.path.exists(output_path):
             os.makedirs(output_path)

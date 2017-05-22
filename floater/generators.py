@@ -334,7 +334,7 @@ class FloatSet(object):
 
 
     def npart_to_2D_array(self, ds1d):
-        """Constructs 2D Dataset from 1D DataArray/DataSet of single or multi-variable.
+        """Constructs 2D Dataset from 1D DataArray/Dataset of single or multi-variable.
 
         PARAMETERS
         ----------
@@ -361,6 +361,7 @@ class FloatSet(object):
         frame_dict.update(var_dict)
         frame = pd.DataFrame(frame_dict)
         framei = frame.set_index('index')
+        framei.columns = var_list
         if self.model_grid is not None:
             ocean_bools = self.ocean_bools
         else:
@@ -368,11 +369,19 @@ class FloatSet(object):
         framei.loc[ocean_bools==True] = df.values.astype(np.float32)
         framei.loc[ocean_bools==False] = np.float32('nan')
         data_vars = {}
+        dim_list = list(ds1d.dims)
+        dim_list.remove('npart')
+        dim_len = len(dim_list)
+        new_shape = (1,)*dim_len + (Ny, Nx)
+        new_dims = dim_list + ['lat', 'lon']
         for var in var_list:
-            frameir = framei[var].values.reshape(Ny, Nx)
-            data_vars.update({var: (['lat', 'lon'], frameir)})
+            frameir = framei[var].values
+            frameir.shape = new_shape
+            data_vars.update({var: (new_dims, frameir)})
+        coords = {}
         lon = np.float32(self.x)
         lat = np.float32(self.y)
-        coords = {'lat': (['lat'], lat), 'lon': (['lon'], lon)}
+        coords.update({dim: ([dim], ds1d[dim].values) for dim in dim_list})
+        coords.update({'lat': (['lat'], lat), 'lon': (['lon'], lon)})
         ds2d = xr.Dataset(data_vars=data_vars, coords=coords)
         return ds2d
