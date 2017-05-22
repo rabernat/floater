@@ -92,17 +92,20 @@ def test_floats_to_netcdf(tmpdir, mitgcm_float_datadir_csv):
     """Test that we can convert MITgcm float data into NetCDF format.
     """
     import xarray as xr
+    from floater.generators import FloatSet
 
-    input_dir = str(mitgcm_float_datadir_csv) + '/'
-    output_dir = str(tmpdir) + '/'
+    input_dir = str(mitgcm_float_datadir_csv)
+    output_dir = str(tmpdir)
     os.chdir(input_dir)
+    fs = FloatSet(xlim=(-5, 5), ylim=(-2, 2), dx=1.0, dy=1.0)
+    fs.to_pickle('./fs.pkl')
 
     # least options
     utils.floats_to_netcdf(input_dir=input_dir, output_fname='test')
     # most options
     utils.floats_to_netcdf(input_dir=input_dir, output_fname='test',
                            float_file_prefix='float_trajectories',
-                           ref_time='1993-01-01',
+                           ref_time='1993-01-01', pkl_path='./fs.pkl',
                            output_dir=output_dir, output_prefix='prefix_test')
 
     # filename prefix test
@@ -112,9 +115,9 @@ def test_floats_to_netcdf(tmpdir, mitgcm_float_datadir_csv):
     mfdm = xr.open_mfdataset('test_netcdf/prefix_test.*.nc')
 
     # dimensions test
-    dims = {'npart': 40, 'time': 2}
-    assert mfdl.dims == dims
-    assert mfdm.dims == dims
+    dims = [{'time': 2, 'npart': 40}, {'time': 2, 'lat': 4, 'lon': 10}]
+    assert mfdl.dims == dims[0]
+    assert mfdm.dims == dims[1]
 
     # variables and values test
     vars_values = [('x',  0.3237109375000000e+03), ('y',   -0.7798437500000000e+02),
@@ -122,7 +125,7 @@ def test_floats_to_netcdf(tmpdir, mitgcm_float_datadir_csv):
                    ('v', -0.2787361934305595e-02), ('vort', 0.9160626946271506e-10)]
     for var, value in vars_values:
         np.testing.assert_almost_equal(mfdl[var].values[0][0], value, 8)
-        np.testing.assert_almost_equal(mfdm[var].values[0][0], value, 8)
+        np.testing.assert_almost_equal(mfdm[var].values[0][0][0], value, 8)
 
     # times test
     times = [(0, 0, np.datetime64('1993-01-01', 'ns')), (1, 86400, np.datetime64('1993-01-02', 'ns'))]

@@ -195,8 +195,8 @@ def test_npart_to_2D_array():
     land_mask.shape = (len(lat), len(lon))
     land_mask[:,0:2] = False
     model_grid = {'lon': lon, 'lat': lat, 'land_mask': land_mask}
-    fs_none = gen.FloatSet(xlim=(0, 9), ylim=(-4, 5), dx=1, dy=1)
-    fs_mask = gen.FloatSet(xlim=(0, 9), ylim=(-4, 5), dx=1, dy=1, model_grid=model_grid)
+    fs_none = gen.FloatSet(xlim=(0, 9), ylim=(-4, 5), dx=1.0, dy=1.0)
+    fs_mask = gen.FloatSet(xlim=(0, 9), ylim=(-4, 5), dx=1.0, dy=1.0, model_grid=model_grid)
     # dataarray/dataset
     var_list = ['test_01', 'test_02', 'test_03']
     values_list_none = []
@@ -205,15 +205,21 @@ def test_npart_to_2D_array():
     data_vars_mask = {}
     for var in var_list:
         values_none = np.random.random(81)
+        values_none.shape = (1, 1, 81)
         values_mask = np.random.random(69)
+        values_mask.shape = (1, 1, 69)
         values_list_none.append(values_none)
         values_list_mask.append(values_mask)
-        data_vars_none.update({var: (['npart'], values_none)})
-        data_vars_mask.update({var: (['npart'], values_mask)})
+        data_vars_none.update({var: (['date', 'loc', 'npart'], values_none)})
+        data_vars_mask.update({var: (['date', 'loc', 'npart'], values_mask)})
     npart_none = np.linspace(1, 81, 81, dtype=np.int32)
     npart_mask = np.linspace(1, 69, 69, dtype=np.int32)
-    coords_none = {'npart': (['npart'], npart_none)}
-    coords_mask = {'npart': (['npart'], npart_mask)}
+    coords_none = {'date': (['date'], np.array([np.datetime64('2000-01-01')])),
+                   'loc': (['loc'], np.array(['New York'])),
+                   'npart': (['npart'], npart_none)}
+    coords_mask = {'date': (['date'], np.array([np.datetime64('2000-01-01')])),
+                   'loc': (['loc'], np.array(['New York'])),
+                   'npart': (['npart'], npart_mask)}
     ds1d_none = xr.Dataset(data_vars=data_vars_none, coords=coords_none)
     ds1d_mask = xr.Dataset(data_vars=data_vars_mask, coords=coords_mask)
     da1d_none = ds1d_none['test_01']
@@ -228,20 +234,23 @@ def test_npart_to_2D_array():
         da2d = fs.npart_to_2D_array(da1d)
         ds2d = fs.npart_to_2D_array(ds1d)
         # shape test
-        assert da2d.to_array().values.shape == (1, fs.Ny, fs.Nx)
-        assert ds2d.to_array().values.shape == (3, fs.Ny, fs.Nx)
+        assert da2d.to_array().values.shape == (1, 1, 1, fs.Ny, fs.Nx)
+        assert ds2d.to_array().values.shape == (3, 1, 1, fs.Ny, fs.Nx)
+        # dimension test
+        assert da2d.dims == {'date': 1, 'loc': 1, 'lat': 9, 'lon': 9}
+        assert ds2d.dims == {'date': 1, 'loc': 1, 'lat': 9, 'lon': 9}
         # coordinates test
         np.testing.assert_allclose(da2d.lon.values, fs.x)
         np.testing.assert_allclose(da2d.lat.values, fs.y)
         np.testing.assert_allclose(ds2d.lon.values, fs.x)
         np.testing.assert_allclose(ds2d.lat.values, fs.y)
         # values test
-        da1d_values = values_list[0]
+        da1d_values = values_list[0][0][0]
         da2d_values_full = da2d.to_array().values[0].ravel()
         da2d_values = da2d_values_full[~np.isnan(da2d_values_full)]
         np.testing.assert_allclose(da2d_values, da1d_values)
         for i in range(3):
-            ds1d_values = values_list[i]
+            ds1d_values = values_list[i][0][0]
             ds2d_values_full = ds2d.to_array().values[i].ravel()
             ds2d_values = ds2d_values_full[~np.isnan(ds2d_values_full)]
             np.testing.assert_allclose(ds2d_values, ds1d_values)

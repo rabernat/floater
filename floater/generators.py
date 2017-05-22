@@ -353,7 +353,7 @@ class FloatSet(object):
         if type(ds1d) == xr.core.dataarray.DataArray:
             ds1d = ds1d.to_dataset()
         df = ds1d.to_dataframe()
-        var_list = list(df)
+        var_list = list(df.columns)
         index_dict = {'index': range(1, Nt+1)}
         var_dict = {var: np.zeros(Nt) for var in var_list}
         frame_dict = {}
