@@ -251,7 +251,7 @@ def floats_to_netcdf(input_dir, output_fname,
 
     match_pattern = float_file_prefix + '.*.csv'
     float_files = glob(os.path.join(input_dir, match_pattern))
-    float_timesteps = set(sorted([int(float_file[-22:-12]) for float_file in float_files]))
+    float_timesteps = sorted(list({int(float_file[-22:-12]) for float_file in float_files}))
 
     float_columns = ['npart', 'time', 'x', 'y', 'z', 'u', 'v', 'vort']
     var_names = float_columns[2:]
