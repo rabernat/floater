@@ -496,7 +496,6 @@ def label_points_in_contours(shape, contours):
     def fill_in_contour(contour, label_data, value=1):
         ymin, xmin = (np.floor(contour.min(axis=0)) - 1).astype('int')
         ymax, xmax = (np.ceil(contour.max(axis=0)) + 1).astype('int')
-        print(((ymin, ymax), (xmin, xmax)))
         # possibly roll the data to deal with periodicity
         roll_x, roll_y = 0, 0
         if ymin < 0:
