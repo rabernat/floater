@@ -237,13 +237,13 @@ def test_npart_to_2D_array():
         assert da2d.to_array().values.shape == (1, 1, 1, fs.Ny, fs.Nx)
         assert ds2d.to_array().values.shape == (3, 1, 1, fs.Ny, fs.Nx)
         # dimension test
-        assert da2d.dims == {'date': 1, 'loc': 1, 'lat': 9, 'lon': 9}
-        assert ds2d.dims == {'date': 1, 'loc': 1, 'lat': 9, 'lon': 9}
+        assert da2d.dims == {'date': 1, 'loc': 1, 'y0': 9, 'x0': 9}
+        assert ds2d.dims == {'date': 1, 'loc': 1, 'y0': 9, 'x0': 9}
         # coordinates test
-        np.testing.assert_allclose(da2d.lon.values, fs.x)
-        np.testing.assert_allclose(da2d.lat.values, fs.y)
-        np.testing.assert_allclose(ds2d.lon.values, fs.x)
-        np.testing.assert_allclose(ds2d.lat.values, fs.y)
+        np.testing.assert_allclose(da2d.x0.values, fs.x)
+        np.testing.assert_allclose(da2d.y0.values, fs.y)
+        np.testing.assert_allclose(ds2d.x0.values, fs.x)
+        np.testing.assert_allclose(ds2d.y0.values, fs.y)
         # values test
         da1d_values = values_list[0][0][0]
         da2d_values_full = da2d.to_array().values[0].ravel()

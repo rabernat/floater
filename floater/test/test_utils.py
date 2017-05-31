@@ -115,7 +115,7 @@ def test_floats_to_netcdf(tmpdir, mitgcm_float_datadir_csv):
     mfdm = xr.open_mfdataset('test_netcdf/prefix_test.*.nc')
 
     # dimensions test
-    dims = [{'time': 2, 'npart': 40}, {'time': 2, 'lat': 4, 'lon': 10}]
+    dims = [{'time': 2, 'npart': 40}, {'time': 2, 'y0': 4, 'x0': 10}]
     assert mfdl.dims == dims[0]
     assert mfdm.dims == dims[1]
 

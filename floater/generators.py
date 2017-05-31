@@ -365,8 +365,12 @@ class FloatSet(object):
             ocean_bools = self.ocean_bools
         else:
             ocean_bools = np.zeros(Nt, dtype=bool)==False
-        da = np.squeeze(ds1d.to_array().values).transpose()
-        framei.loc[ocean_bools==True] = da.astype(np.float32)
+        da = ds1d.to_array().values
+        axis_len = len(da.shape) - 2
+        axis = tuple(np.linspace(1, axis_len, axis_len, dtype=np.int32))
+        das = np.squeeze(da, axis=axis)
+        dast = das.transpose()
+        framei.loc[ocean_bools==True] = dast.astype(np.float32)
         framei.loc[ocean_bools==False] = np.float32('nan')
         dim_list = list(ds1d.dims)
         dim_list.remove('npart')
