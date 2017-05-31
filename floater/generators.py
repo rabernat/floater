@@ -352,10 +352,9 @@ class FloatSet(object):
         Nt = Nx*Ny
         if type(ds1d) == xr.core.dataarray.DataArray:
             ds1d = ds1d.to_dataset()
-        df = ds1d.to_dataframe()
-        var_list = list(df.columns)
-        index_dict = {'index': range(1, Nt+1)}
-        var_dict = {var: np.zeros(Nt) for var in var_list}
+        index_dict = {'index': np.linspace(1, Nt, Nt, dtype=np.int32)}
+        var_list = list(ds1d.data_vars)
+        var_dict = {var: np.zeros(Nt, dtype=np.float32) for var in var_list}
         frame_dict = {}
         frame_dict.update(index_dict)
         frame_dict.update(var_dict)
@@ -366,22 +365,23 @@ class FloatSet(object):
             ocean_bools = self.ocean_bools
         else:
             ocean_bools = np.zeros(Nt, dtype=bool)==False
-        framei.loc[ocean_bools==True] = df.values.astype(np.float32)
+        da = np.squeeze(ds1d.to_array().values).transpose()
+        framei.loc[ocean_bools==True] = da.astype(np.float32)
         framei.loc[ocean_bools==False] = np.float32('nan')
-        data_vars = {}
         dim_list = list(ds1d.dims)
         dim_list.remove('npart')
         dim_len = len(dim_list)
         new_shape = (1,)*dim_len + (Ny, Nx)
-        new_dims = dim_list + ['lat', 'lon']
+        new_dims = dim_list + ['y0', 'x0']
+        data_vars = {}
         for var in var_list:
             frameir = framei[var].values
             frameir.shape = new_shape
             data_vars.update({var: (new_dims, frameir)})
+        x0 = np.float32(self.x)
+        y0 = np.float32(self.y)
         coords = {}
-        lon = np.float32(self.x)
-        lat = np.float32(self.y)
         coords.update({dim: ([dim], ds1d[dim].values) for dim in dim_list})
-        coords.update({'lat': (['lat'], lat), 'lon': (['lon'], lon)})
+        coords.update({'y0': (['y0'], y0), 'x0': (['x0'], x0)})
         ds2d = xr.Dataset(data_vars=data_vars, coords=coords)
         return ds2d
