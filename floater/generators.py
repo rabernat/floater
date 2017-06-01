@@ -344,7 +344,7 @@ class FloatSet(object):
         RETURNS
         -------
         ds2d : 2D Dataset
-            Two-dimensional dataset of physical variable(s) with dimensions 'lat' and 'lon'
+            Two-dimensional dataset of physical variable(s) with dimensions 'y0' and 'x0'
         """
 
         Nx = self.Nx
