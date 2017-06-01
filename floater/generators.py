@@ -352,9 +352,9 @@ class FloatSet(object):
         Nt = Nx*Ny
         if type(ds1d) == xr.core.dataarray.DataArray:
             ds1d = ds1d.to_dataset()
-        index_dict = {'index': np.linspace(1, Nt, Nt, dtype=np.int32)}
+        index_dict = {'index': np.arange(1, Nt+1, dtype=np.int32)}
         var_list = list(ds1d.data_vars)
-        var_dict = {var: np.zeros(Nt, dtype=np.float32) for var in var_list}
+        var_dict = {var: np.full(Nt, np.nan, dtype=np.float32) for var in var_list}
         frame_dict = {}
         frame_dict.update(index_dict)
         frame_dict.update(var_dict)
@@ -364,14 +364,13 @@ class FloatSet(object):
         if self.model_grid is not None:
             ocean_bools = self.ocean_bools
         else:
-            ocean_bools = np.zeros(Nt, dtype=bool)==False
+            ocean_bools = np.full(Nt, True, dtype=bool)
         da = ds1d.to_array().values
         axis_len = len(da.shape) - 2
-        axis = tuple(np.linspace(1, axis_len, axis_len, dtype=np.int32))
+        axis = tuple(np.arange(1, axis_len+1, dtype=np.int32))
         das = np.squeeze(da, axis=axis)
         dast = das.transpose()
         framei.loc[ocean_bools==True] = dast.astype(np.float32)
-        framei.loc[ocean_bools==False] = np.float32('nan')
         dim_list = list(ds1d.dims)
         dim_list.remove('npart')
         dim_len = len(dim_list)
