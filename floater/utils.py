@@ -253,9 +253,14 @@ def floats_to_netcdf(input_dir, output_fname,
     float_files = glob(os.path.join(input_dir, match_pattern))
     float_timesteps = sorted(list({int(float_file[-22:-12]) for float_file in float_files}))
 
+    default_header = ['npart', 'time', 'x', 'y', 'z', 'u', 'v', 'vort']
+
     for float_timestep in tqdm(float_timesteps):
         input_path = os.path.join(input_dir, '%s.%010d.*.csv' % (float_file_prefix, float_timestep))
         df = dd.read_csv(input_path)
+        if df.columns.values[0] != 'npart':  # check if old format
+            columns = ['npart', 'time', 'x', 'y', 'z', 'u', 'v', 'vort']
+            df = dd.read_csv(input_path, names=columns, header=None)
         dfc = df.compute()
         dfcs = dfc.sort_values('npart')
         del_time = int(dfcs.time.values[0])
