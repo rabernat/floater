@@ -272,7 +272,7 @@ def floats_to_netcdf(input_dir, output_fname,
             time = np.array([np.int32(del_time)])
         npart = dfcs.npart.values.astype(np.int32)
         var_shape = (1, len(npart))
-        var_names = list(dfcs.columns)[2:]
+        var_names = dfcs.columns[2:]
         data_vars = {var_name: (['time', 'npart'], dfcs[var_name].values.astype(np.float32).reshape(var_shape)) for var_name in var_names}
         ds = xr.Dataset(data_vars, coords={'time': time, 'npart': npart})
         if pkl_path is not None:
