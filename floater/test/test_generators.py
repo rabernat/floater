@@ -189,14 +189,14 @@ def test_pickling_with_land(fs_with_land, tmpdir):
 
 def test_npart_to_2D_array():
     # floatsets
-    lon = np.linspace(0, 8, 9, dtype=np.float32)
-    lat = np.linspace(-4, 4, 9, dtype=np.float32)
-    land_mask = np.zeros(81, dtype=bool)==False
+    lon = np.arange(0, 9, dtype=np.float32)
+    lat = np.arange(-4, 5, dtype=np.float32)
+    land_mask = np.full(81, True, dtype=bool)
     land_mask.shape = (len(lat), len(lon))
     land_mask[:,0:2] = False
     model_grid = {'lon': lon, 'lat': lat, 'land_mask': land_mask}
-    fs_none = gen.FloatSet(xlim=(0, 9), ylim=(-4, 5), dx=1.0, dy=1.0)
-    fs_mask = gen.FloatSet(xlim=(0, 9), ylim=(-4, 5), dx=1.0, dy=1.0, model_grid=model_grid)
+    fs_none = gen.FloatSet(xlim=(0, 9), ylim=(-4, 5))
+    fs_mask = gen.FloatSet(xlim=(0, 9), ylim=(-4, 5), model_grid=model_grid)
     # dataarray/dataset
     var_list = ['test_01', 'test_02', 'test_03']
     values_list_none = []
@@ -212,8 +212,8 @@ def test_npart_to_2D_array():
         values_list_mask.append(values_mask)
         data_vars_none.update({var: (['date', 'loc', 'npart'], values_none)})
         data_vars_mask.update({var: (['date', 'loc', 'npart'], values_mask)})
-    npart_none = np.linspace(1, 81, 81, dtype=np.int32)
-    npart_mask = np.linspace(1, 69, 69, dtype=np.int32)
+    npart_none = np.arange(1, 82, dtype=np.int32)
+    npart_mask = np.arange(1, 70, dtype=np.int32)
     coords_none = {'date': (['date'], np.array([np.datetime64('2000-01-01')])),
                    'loc': (['loc'], np.array(['New York'])),
                    'npart': (['npart'], npart_none)}
