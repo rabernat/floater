@@ -197,23 +197,26 @@ def test_npart_to_2D_array():
     model_grid = {'lon': lon, 'lat': lat, 'land_mask': land_mask}
     fs_none = gen.FloatSet(xlim=(0, 9), ylim=(-4, 5))
     fs_mask = gen.FloatSet(xlim=(0, 9), ylim=(-4, 5), model_grid=model_grid)
+    fs_mask.get_rectmesh()
     # dataarray/dataset
     var_list = ['test_01', 'test_02', 'test_03']
     values_list_none = []
     values_list_mask = []
     data_vars_none = {}
     data_vars_mask = {}
+    len_none = 81
+    len_mask = list(fs_mask.ocean_bools).count(True)
     for var in var_list:
-        values_none = np.random.random(81)
-        values_none.shape = (1, 1, 81)
-        values_mask = np.random.random(69)
-        values_mask.shape = (1, 1, 69)
+        values_none = np.random.random(len_none)
+        values_none.shape = (1, 1, len_none)
+        values_mask = np.random.random(len_mask)
+        values_mask.shape = (1, 1, len_mask)
         values_list_none.append(values_none)
         values_list_mask.append(values_mask)
         data_vars_none.update({var: (['date', 'loc', 'npart'], values_none)})
         data_vars_mask.update({var: (['date', 'loc', 'npart'], values_mask)})
-    npart_none = np.arange(1, 82, dtype=np.int32)
-    npart_mask = np.arange(1, 70, dtype=np.int32)
+    npart_none = np.arange(1, len_none+1, dtype=np.int32)
+    npart_mask = np.arange(1, len_mask+1, dtype=np.int32)
     coords_none = {'date': (['date'], np.array([np.datetime64('2000-01-01')])),
                    'loc': (['loc'], np.array(['New York'])),
                    'npart': (['npart'], npart_none)}
@@ -229,7 +232,6 @@ def test_npart_to_2D_array():
     test_mask = (fs_mask, da1d_mask, ds1d_mask, values_list_mask)
     test_list = [test_none, test_mask]
     for fs, da1d, ds1d, values_list in test_list:
-        fs.get_rectmesh()
         # method test
         da2d = fs.npart_to_2D_array(da1d)
         ds2d = fs.npart_to_2D_array(ds1d)

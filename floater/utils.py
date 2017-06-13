@@ -253,15 +253,12 @@ def floats_to_netcdf(input_dir, output_fname,
     float_files = glob(os.path.join(input_dir, match_pattern))
     float_timesteps = sorted(list({int(float_file[-22:-12]) for float_file in float_files}))
 
-    float_columns = ['npart', 'time', 'x', 'y', 'z', 'u', 'v', 'vort']
-    var_names = float_columns[2:]
-
     for float_timestep in tqdm(float_timesteps):
         input_path = os.path.join(input_dir, '%s.%010d.*.csv' % (float_file_prefix, float_timestep))
-        # df = dd.read_csv(input_path)
-        # if df.columns.values[0] != 'npart':  # check if old format
-        #     columns = ['npart', 'time', 'x', 'y', 'z', 'u', 'v', 'vort']
-        df = dd.read_csv(input_path, names=float_columns, header=None)
+        df = dd.read_csv(input_path)
+        if df.columns.values[0] is not 'npart':
+            float_columns = ['npart', 'time', 'x', 'y', 'z', 'u', 'v', 'vort']
+            df = dd.read_csv(input_path, names=float_columns, header=None)
         dfc = df.compute()
         dfcs = dfc.sort_values('npart')
         del_time = int(dfcs.time.values[0])
@@ -273,7 +270,7 @@ def floats_to_netcdf(input_dir, output_fname,
             time = np.array([np.int32(del_time)])
         npart = dfcs.npart.values.astype(np.int32)
         var_shape = (1, len(npart))
-        # var_names = dfcs.columns.values[2:]
+        var_names = dfcs.columns.values[2:]
         data_vars = {var_name: (['time', 'npart'], dfcs[var_name].values.astype(np.float32).reshape(var_shape)) for var_name in var_names}
         ds = xr.Dataset(data_vars, coords={'time': time, 'npart': npart})
         if pkl_path is not None:
