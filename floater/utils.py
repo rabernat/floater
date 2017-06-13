@@ -251,13 +251,13 @@ def floats_to_netcdf(input_dir, output_fname,
 
     match_pattern = float_file_prefix + '.*.csv'
     float_files = glob(os.path.join(input_dir, match_pattern))
-    header_type = type(dd.read_csv(float_files[0]).columns[0])
+    float_header = dd.read_csv(float_files[0]).columns
     float_timesteps = sorted(list({int(float_file[-22:-12]) for float_file in float_files}))
     float_columns = ['npart', 'time', 'x', 'y', 'z', 'u', 'v', 'vort']
 
     for float_timestep in tqdm(float_timesteps):
         input_path = os.path.join(input_dir, '%s.%010d.*.csv' % (float_file_prefix, float_timestep))
-        if header_type is not str:
+        if float_header[0] != 'npart':
             df = dd.read_csv(input_path, names=float_columns, header=None)
         else:
             df = dd.read_csv(input_path)
