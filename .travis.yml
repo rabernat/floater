@@ -12,8 +12,13 @@ python:
   - 3.6
 
 env:
-  - CONDA_PACKAGES="numpy scipy pandas bcolz pytest future xarray dask scikit-image"
-    PIP_PACKAGES="tqdm codecov pytest-cov tqdm"
+  global:
+    - CONDA_PACKAGES="scipy bcolz pytest future xarray dask scikit-image"
+    - PIP_PACKAGES="tqdm codecov pytest-cov tqdm"
+  matrix:
+    - NUMPY="numpy" PANDAS="pandas"
+    - NUMPY="numpy=1.12.1" PANDAS="pandas"
+    - NUMPY="numpy" PANDAS="pandas=0.19.2"
 
 before_install:
   - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
@@ -30,7 +35,7 @@ before_install:
   - conda info -a
 
 install:
-  - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION $CONDA_PACKAGES
+  - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION $CONDA_PACKAGES $NUMPY $PANDAS
   - source activate test-environment
   - pip install $PIP_PACKAGES
   - pip install -e .
