@@ -242,6 +242,7 @@ def floats_to_netcdf(input_dir, output_fname,
         Prefix of the transcoded NetCDF files
     """
     import dask.dataframe as dd
+    import pandas as pd
     import xarray as xr
     from floater.generators import FloatSet
     from glob import glob
@@ -251,7 +252,7 @@ def floats_to_netcdf(input_dir, output_fname,
 
     match_pattern = float_file_prefix + '.*.csv'
     float_files = glob(os.path.join(input_dir, match_pattern))
-    float_header = dd.read_csv(float_files[0]).columns
+    float_header = pd.read_csv(float_files[0], nrows=0).columns
     float_timesteps = sorted(list({int(float_file[-22:-12]) for float_file in float_files}))
     float_columns = ['npart', 'time', 'x', 'y', 'z', 'u', 'v', 'vort']
 

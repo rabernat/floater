@@ -16,9 +16,11 @@ _TESTVALS_FIRST = (1127925.0, 6134400.0, 247.69285583496094, -63.59305191040039,
                  -0.08639287948608398, 0.12957383692264557, -0.12062723934650421,
                  0.0, 0.0, 2.6598372642183676e-06)
 
-_TESTDATA_FILENAME_CSV = 'sample_mitgcm_float_trajectories_csv.tar.gz'
-_TMPDIR_SUBDIR_CSV = 'sample_mitgcm_data_csv'
+_TESTDATA_FILENAME_CSV_OLD = 'sample_mitgcm_float_trajectories_csv_old.tar.gz'
+_TMPDIR_SUBDIR_CSV_OLD = 'sample_mitgcm_data_csv_old'
 
+_TESTDATA_FILENAME_CSV_NEW = 'sample_mitgcm_float_trajectories_csv_new.tar.gz'
+_TMPDIR_SUBDIR_CSV_NEW = 'sample_mitgcm_data_csv_new'
 
 #@pytest.fixture()
 #def empty_output_dir(tmpdir):
@@ -41,12 +43,24 @@ def mitgcm_float_datadir(tmpdir_factory, request):
     return target_dir
 
 @pytest.fixture(scope='module')
-def mitgcm_float_datadir_csv(tmpdir_factory, request):
+def mitgcm_float_datadir_csv_old(tmpdir_factory, request):
     filename = request.module.__file__
-    datafile = os.path.join(os.path.dirname(filename), _TESTDATA_FILENAME_CSV)
+    datafile = os.path.join(os.path.dirname(filename), _TESTDATA_FILENAME_CSV_OLD)
     if not os.path.exists(datafile):
         raise IOError('Could not find data file %s' % datafile)
-    target_dir = str(tmpdir_factory.mktemp(_TMPDIR_SUBDIR_CSV))
+    target_dir = str(tmpdir_factory.mktemp(_TMPDIR_SUBDIR_CSV_OLD))
+    tar = tarfile.open(datafile)
+    tar.extractall(target_dir)
+    tar.close()
+    return target_dir
+
+@pytest.fixture(scope='module')
+def mitgcm_float_datadir_csv_new(tmpdir_factory, request):
+    filename = request.module.__file__
+    datafile = os.path.join(os.path.dirname(filename), _TESTDATA_FILENAME_CSV_NEW)
+    if not os.path.exists(datafile):
+        raise IOError('Could not find data file %s' % datafile)
+    target_dir = str(tmpdir_factory.mktemp(_TMPDIR_SUBDIR_CSV_NEW))
     tar = tarfile.open(datafile)
     tar.extractall(target_dir)
     tar.close()
@@ -88,47 +102,71 @@ def test_floats_to_bcolz(tmpdir, mitgcm_float_datadir):
     for name, val in zip(_NAMES, _TESTVALS_FIRST):
         np.testing.assert_almost_equal(bc[0][name], val)
 
-def test_floats_to_netcdf(tmpdir, mitgcm_float_datadir_csv):
+def test_floats_to_netcdf(tmpdir,
+                          mitgcm_float_datadir_csv_old,
+                          mitgcm_float_datadir_csv_new):
     """Test that we can convert MITgcm float data into NetCDF format.
     """
     import xarray as xr
     from floater.generators import FloatSet
 
-    input_dir = str(mitgcm_float_datadir_csv)
+    input_dir_old = str(mitgcm_float_datadir_csv_old)
+    input_dir_new = str(mitgcm_float_datadir_csv_new)
     output_dir = str(tmpdir)
-    os.chdir(input_dir)
-    fs = FloatSet(xlim=(-5, 5), ylim=(-2, 2), dx=1.0, dy=1.0)
-    fs.to_pickle('./fs.pkl')
+    fs = FloatSet(xlim=(-5, 5), ylim=(-2, 2))
 
+    os.chdir(input_dir_old)
+    fs.to_pickle('./fs.pkl')
     # least options
-    utils.floats_to_netcdf(input_dir=input_dir, output_fname='test')
+    utils.floats_to_netcdf(input_dir='./', output_fname='test_old')
     # most options
-    utils.floats_to_netcdf(input_dir=input_dir, output_fname='test',
+    utils.floats_to_netcdf(input_dir='./', output_fname='test_old',
+                           float_file_prefix='float_trajectories',
+                           ref_time='1993-01-01', pkl_path='./fs.pkl',
+                           output_dir=output_dir, output_prefix='prefix_test')
+
+    os.chdir(input_dir_new)
+    fs.to_pickle('./fs.pkl')
+    # least options
+    utils.floats_to_netcdf(input_dir='./', output_fname='test_new')
+    # most options
+    utils.floats_to_netcdf(input_dir='./', output_fname='test_new',
                            float_file_prefix='float_trajectories',
                            ref_time='1993-01-01', pkl_path='./fs.pkl',
                            output_dir=output_dir, output_prefix='prefix_test')
 
     # filename prefix test
-    os.chdir(input_dir)
-    mfdl = xr.open_mfdataset('test_netcdf/float_trajectories.*.nc')
+    os.chdir(input_dir_old)
+    mfdol = xr.open_mfdataset('test_old_netcdf/float_trajectories.*.nc')
+    os.chdir(input_dir_new)
+    mfdnl = xr.open_mfdataset('test_new_netcdf/float_trajectories.*.nc')
     os.chdir(output_dir)
-    mfdm = xr.open_mfdataset('test_netcdf/prefix_test.*.nc')
+    mfdom = xr.open_mfdataset('test_old_netcdf/prefix_test.*.nc')
+    mfdnm = xr.open_mfdataset('test_new_netcdf/prefix_test.*.nc')
 
     # dimensions test
     dims = [{'time': 2, 'npart': 40}, {'time': 2, 'y0': 4, 'x0': 10}]
-    assert mfdl.dims == dims[0]
-    assert mfdm.dims == dims[1]
+    assert mfdol.dims == dims[0]
+    assert mfdom.dims == dims[1]
+    assert mfdnl.dims == dims[0]
+    assert mfdnm.dims == dims[1]
 
     # variables and values test
-    vars_values = [('x',  0.3237109375000000e+03), ('y',   -0.7798437500000000e+02),
-                   ('z', -0.4999999999999893e+00), ('u',   -0.5346306607990328e-02),
-                   ('v', -0.2787361934305595e-02), ('vort', 0.9160626946271506e-10)]
+    vars_values = [('x',  0.1961093750000000E+03), ('y',   -0.7848437500000000E+02),
+                   ('z', -0.4999999999999893E+00), ('u',    0.3567512409555351E-04),
+                   ('v',  0.1028276712547044E-03), ('vort', 0.0000000000000000E+00)]
     for var, value in vars_values:
-        np.testing.assert_almost_equal(mfdl[var].values[0][0], value, 8)
-        np.testing.assert_almost_equal(mfdm[var].values[0][0][0], value, 8)
+        np.testing.assert_almost_equal(mfdol[var].values[0][0], value, 8)
+        np.testing.assert_almost_equal(mfdom[var].values[0][0][0], value, 8)
+    vars_values.append(('lavd', 0.0000000000000000E+00))
+    for var, value in vars_values:
+        np.testing.assert_almost_equal(mfdnl[var].values[0][0], value, 8)
+        np.testing.assert_almost_equal(mfdnm[var].values[0][0][0], value, 8)
 
     # times test
-    times = [(0, 0, np.datetime64('1993-01-01', 'ns')), (1, 86400, np.datetime64('1993-01-02', 'ns'))]
+    times = [(0, 0, np.datetime64('1993-01-01', 'ns')), (1, 2592000, np.datetime64('1993-01-31', 'ns'))]
     for i, sec, time in times:
-        assert mfdl['time'][i].values == sec
-        assert mfdm['time'][i].values == time
+        assert mfdol['time'][i].values == sec
+        assert mfdom['time'][i].values == time
+        assert mfdnl['time'][i].values == sec
+        assert mfdnm['time'][i].values == time
