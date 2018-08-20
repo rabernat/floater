@@ -10,13 +10,14 @@ from scipy.spatial import cKDTree
 
 
 def geo_to_xyz(geo_cord):
-    lon_deg, lat_deg = geo_cord.transpose()
+    lon_deg, lat_deg,depth =np.vsplit(geo_cord,3)
+    earthrad=6371000
     lat = np.radians(lat_deg)
     lon = np.radians(lon_deg)
-    x = np.cos(lat)*np.cos(lon)
-    y = np.cos(lat)*np.sin(lon)
-    z = np.sin(lat)
-    xyz_cord = np.transpose(np.array((x,y,z)))
+    x =  (earthrad+depth)*np.cos(lat)*np.cos(lon)
+    y =  (earthrad+depth)*np.cos(lat)*np.sin(lon)
+    z =  (earthrad+depth)*np.sin(lat)
+    xyz_cord = np.squeeze(np.transpose(np.array((x,y,z)),(2,0,1)))
     return xyz_cord
 
 def xyz_to_geo(xyz_coord):
@@ -32,7 +33,7 @@ def xyz_to_geo(xyz_coord):
 class FloatSet(object):
     """Represents a set of initial float positions on a regular grid."""
 
-    def __init__(self, xlim=None, ylim=None, dx=1., dy=1., model_grid=None, load_path=None):
+    def __init__(self, xlim=None, ylim=None, dx=1., dy=1., model_grid=None, load_path=None, zvect=None):
         """Initialize FloatSet according to specified rectangular grid geometry.
 
         PARAMETERS
@@ -41,6 +42,7 @@ class FloatSet(object):
             minimum and maximum x coordinate of cell vertices
         ylim : tuple of two floats
             minimum and maximum y coordinate of cell vertices
+        zvect : 1d array of depths
         dx : float
             grid spacing in x direction
         dy : float
@@ -51,8 +53,11 @@ class FloatSet(object):
                 2d array of dimensions in C order: shape==(len(lat), len(lon))
                 An element is True iff the corresponding tracer cell grid point
                 is unmasked (ocean)
+                OR
+                3d array of dimensions in C order shape==(len(depth),len(lat), len(lon))
             'lon': 1d array of the mask grid longitudes
             'lat': 1d array of the mask grid latitudes
+            'rc' : 1d array of mask depths
 
         load_path : str
             The filename to load a saved floatset object from
@@ -76,6 +81,16 @@ class FloatSet(object):
             self.Ny = int(self.Ly / self.dy)
             self.x = self.xlim[0] + self.dx * np.arange(self.Nx) + self.dx/2
             self.y = self.ylim[0] + self.dy * np.arange(self.Ny) + self.dy/2
+            try:
+                zvect[1]
+            except (NameError,TypeError,AttributeError) as e:
+                self.z=-0.5
+                self.Nz=1
+                self.zvect=[-0.5]
+            else:
+                self.zvect = zvect
+                self.z = zvect
+                self.Nz=len(zvect)
             self.model_grid = model_grid
         else:
             self.from_pickle(load_path)
@@ -88,15 +103,17 @@ class FloatSet(object):
         RETURNS
         -------
         x : np.ndarray
-            2D array of float x coordinates
+            3D array of float x coordinates
         y : np.ndarray
-            2D array of float y coordinates
+            3D array of float y coordinates
+        z : np.ndarray
+            3D array of float z coordinates
         """
 
-        xx, yy = np.meshgrid(self.x, self.y)
+        xx, yy, zz = np.meshgrid(self.x, self.y,self.z)
         if self.model_grid is not None:
-            xx, yy = self.subset_floats_from_mask(xx, yy)
-        return xx, yy
+            xx, yy, zz = self.subset_floats_from_mask(xx, yy, zz)
+        return xx, yy, zz
 
 
     def get_hexmesh(self):
@@ -105,19 +122,21 @@ class FloatSet(object):
         RETURNS
         -------
         x : np.ndarray
-            2D array of float x coordinates
+            3D array of float x coordinates
         y : np.ndarray
-            2D array of float y coordinates
+            3D array of float y coordinates
+        z : np.ndarray
+            3D array of float z coordinates
         """
 
-        xx, yy = self.get_rectmesh()
+        xx, yy, zz = self.get_rectmesh()
         # modify to be even-R horizontal offset
         xx[::2] += self.dx/4
         xx[1::2] -= self.dx/4
 
         if self.model_grid is not None:
-            xx, yy = self.subset_floats_from_mask(xx, yy)
-        return xx, yy
+            xx, yy, zz = self.subset_floats_from_mask(xx, yy, zz)
+        return xx, yy, zz
 
 
     def npart_index_to_ndarray(self, data, npart):
@@ -140,7 +159,7 @@ class FloatSet(object):
             return self.dx * self.dy
         else:
             R = 6.371e6
-            lon, lat = self.get_rectmesh()
+            lon, lat,depth = self.get_rectmesh()
             dy = R * np.radians(self.dy)
             dx = R * np.radians(self.dx) * np.cos(np.radians(lat))
             # old code, wrong!
@@ -183,9 +202,9 @@ class FloatSet(object):
                              'got %g' % read_binary_prec )
 
         if mesh == 'hex':
-            xx, yy = self.get_hexmesh()
+            xx, yy, zz = self.get_hexmesh()
         else:
-            xx, yy = self.get_rectmesh()
+            xx, yy, zz = self.get_rectmesh()
         myx = xx
 
         ini_times = 1
@@ -193,12 +212,13 @@ class FloatSet(object):
         # initial positions
         lon = myx.ravel()
         lat = yy.ravel()
+        kpart=zz.ravel()
 
         # other float properties
 
         # kpart: depth of float release in meters, depth is negative, i.e. -1500
         # for 1500 m
-        kpart = -0.5
+        #kpart = -0.5
 
         # kfloat: target level of float (??)
         kfloat = -0.5
@@ -267,7 +287,7 @@ class FloatSet(object):
 
 
 
-    def subset_floats_from_mask(self, xx, yy):
+    def subset_floats_from_mask(self, xx, yy, zz):
         """Eliminate float positions that are on land land mask.
 
         PARAMETERS
@@ -276,46 +296,55 @@ class FloatSet(object):
             float longitudes
         yy : arraylike
             float latitudes
+        zz  :  arraylike
+            float depths
         model_grid : dictionary
             the following key value pairs are expected
                 'land_mask': np.ndarray of bools
                     2d array of dimensions in C order: shape==(len(lat), len(lon))
                     An element is True iff the corresponding tracer cell grid point
                     is unmasked (ocean)
+                    OR 3d array
                 'lon': 1d array of the mask grid longitudes
                 'lat': 1d array of the mask grid latitudes
-
+                'rc': 1d array of mask grid depths
         RETURNS
         -------
-        xx_masked, yy_masked: np.ndarray
+        xx_masked, yy_masked, zz_masked: np.ndarray
             1D arrays of float coordinates subarrays:
         """
 
         xx = xx.ravel()
         yy = yy.ravel()
+        zz = zz.ravel()
 
         mask_lon = self.model_grid['lon']
         mask_lat = self.model_grid['lat']
         land_mask = self.model_grid['land_mask']
+        if "rc" in self.model_grid:
+            mask_depth = self.model_grid['rc']
+        else:
+            mask_depth=np.asarray(1)
+            #land_mask=np.expand_dims(land_mask,axis=2)
         # we require the array to be using using C order
-        assert land_mask.shape == (len(mask_lat), len(mask_lon))
+        assert land_mask.shape == (len(mask_lat), len(mask_lon),mask_depth.size)
 
         # fast cartesian product
-        mask_geo = np.dstack(np.meshgrid(mask_lon, mask_lat))
-        mask_geo = mask_geo.reshape(-1, 2)
+        mask_geo = np.stack(np.meshgrid(mask_lon, mask_lat,mask_depth))
+        mask_geo = mask_geo.reshape(3,-1)
 
         mask_bool_flat = land_mask.ravel()
         mask_xyz = geo_to_xyz(mask_geo)
         # a KDTree of the mask data in xyz form
         mask_tree = cKDTree(mask_xyz)
-        floats_geo = np.transpose([xx.ravel(), yy.ravel()])
+        floats_geo = np.array([xx.ravel(), yy.ravel(), zz.ravel()])
         # uniform hexagonal tiling
         queries_xyz = geo_to_xyz(floats_geo)
         # search for nearest neighbors
         dist, neighbor_indices = mask_tree.query(queries_xyz, n_jobs=-1)
         self.ocean_bools = np.take(mask_bool_flat, neighbor_indices.ravel()) # True -> neighbor is tracer ocean
-        floats_ocean = floats_geo[np.nonzero(self.ocean_bools.astype('int'))].T
-
+        floats_ocean = floats_geo[:,np.nonzero(self.ocean_bools.astype('int'))].T
+        floats_ocean=np.transpose(np.squeeze(floats_ocean))
         return floats_ocean
 
 
