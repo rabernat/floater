@@ -84,7 +84,7 @@ class FloatSet(object):
             try:
                 zvect[1]
             except (NameError,TypeError,AttributeError) as e:
-                self.z=-0.5
+                self.z=np.asarray(-0.5)
                 self.Nz=1
                 self.zvect=[-0.5]
             else:
@@ -110,10 +110,17 @@ class FloatSet(object):
             3D array of float z coordinates
         """
 
-        xx, yy, zz = np.meshgrid(self.x, self.y,self.z)
-        if self.model_grid is not None:
-            xx, yy, zz = self.subset_floats_from_mask(xx, yy, zz)
-        return xx, yy, zz
+        if np.all(self.z==-0.5):
+            xx, yy = np.meshgrid(self.x, self.y)
+            if self.model_grid is not None:
+                zz=np.ones(xx.size)*-0.5
+                xx, yy = self.subset_floats_from_mask(xx, yy,zz)
+            return xx,yy
+        else:
+            xx, yy, zz = np.meshgrid(self.x, self.y,self.z)
+            if self.model_grid is not None:
+                xx, yy, zz = self.subset_floats_from_mask(xx, yy, zz)
+            return xx, yy, zz
 
 
     def get_hexmesh(self):
@@ -128,15 +135,24 @@ class FloatSet(object):
         z : np.ndarray
             3D array of float z coordinates
         """
+        if np.all(self.z==-0.5):
+            xx, yy = self.get_rectmesh()
+            # modify to be even-R horizontal offset
+            xx[::2] += self.dx/4
+            xx[1::2] -= self.dx/4
+            if self.model_grid is not None:
+                zz=np.ones(xx.size)*-0.5
+                xx, yy = self.subset_floats_from_mask(xx, yy, zz)
+            return xx,yy
+        else:
+            xx, yy, zz = self.get_rectmesh()
+            # modify to be even-R horizontal offset 
+            xx[::2] += self.dx/4
+            xx[1::2] -= self.dx/4
 
-        xx, yy, zz = self.get_rectmesh()
-        # modify to be even-R horizontal offset
-        xx[::2] += self.dx/4
-        xx[1::2] -= self.dx/4
-
-        if self.model_grid is not None:
-            xx, yy, zz = self.subset_floats_from_mask(xx, yy, zz)
-        return xx, yy, zz
+            if self.model_grid is not None:
+                xx, yy, zz = self.subset_floats_from_mask(xx, yy, zz)
+            return xx, yy, zz
 
 
     def npart_index_to_ndarray(self, data, npart):
@@ -159,7 +175,10 @@ class FloatSet(object):
             return self.dx * self.dy
         else:
             R = 6.371e6
-            lon, lat,depth = self.get_rectmesh()
+            if np.all(self.z==-0.5):
+                lon, lat = self.get_rectmesh()
+            else:
+                lon, lat,depth = self.get_rectmesh()
             dy = R * np.radians(self.dy)
             dx = R * np.radians(self.dx) * np.cos(np.radians(lat))
             # old code, wrong!
@@ -201,10 +220,14 @@ class FloatSet(object):
             raise ValueError('read_binary_prec should be 32 or 64; '
                              'got %g' % read_binary_prec )
 
-        if mesh == 'hex':
+        if mesh == 'hex' and np.any(self.z!=-0.5):
             xx, yy, zz = self.get_hexmesh()
-        else:
+        elif mesh == 'hex' and np.all(self.z==-0.5):
+            xx, yy = self.get_hexmesh()
+        elif np.any(self.z!=-0.5):
             xx, yy, zz = self.get_rectmesh()
+        else:
+            xx, yy = self.get_rectmesh()
         myx = xx
 
         ini_times = 1
@@ -212,7 +235,10 @@ class FloatSet(object):
         # initial positions
         lon = myx.ravel()
         lat = yy.ravel()
-        kpart=zz.ravel()
+        if np.all(self.z==-0.5):
+            kpart=-0.5
+        else:
+            kpart=zz.ravel()
 
         # other float properties
 
@@ -324,10 +350,10 @@ class FloatSet(object):
         if "rc" in self.model_grid:
             mask_depth = self.model_grid['rc']
         else:
-            mask_depth=np.asarray(1)
-            #land_mask=np.expand_dims(land_mask,axis=2)
+            mask_depth=[-0.5]
+            land_mask=np.expand_dims(land_mask,axis=2)
         # we require the array to be using using C order
-        assert land_mask.shape == (len(mask_lat), len(mask_lon),mask_depth.size)
+        assert land_mask.shape[0:2] == (len(mask_lat), len(mask_lon))
 
         # fast cartesian product
         mask_geo = np.stack(np.meshgrid(mask_lon, mask_lat,mask_depth))
@@ -343,9 +369,13 @@ class FloatSet(object):
         # search for nearest neighbors
         dist, neighbor_indices = mask_tree.query(queries_xyz, n_jobs=-1)
         self.ocean_bools = np.take(mask_bool_flat, neighbor_indices.ravel()) # True -> neighbor is tracer ocean
+        print(self.ocean_bools.size)
         floats_ocean = floats_geo[:,np.nonzero(self.ocean_bools.astype('int'))].T
         floats_ocean=np.transpose(np.squeeze(floats_ocean))
-        return floats_ocean
+        if np.all(self.z==-0.5):
+            return floats_ocean[0:2,:]
+        else:
+            return floats_ocean
 
 
     def npart_to_2D_array(self, ds1d):
