@@ -82,8 +82,8 @@ class FloatSet(object):
             self.x = self.xlim[0] + self.dx * np.arange(self.Nx) + self.dx/2
             self.y = self.ylim[0] + self.dy * np.arange(self.Ny) + self.dy/2
             try:
-                zvect[1]
-            except (NameError,TypeError,AttributeError) as e:
+                zvect[0]
+            except (NameError,TypeError,AttributeError,KeyError) as e:
                 self.z=np.asarray(-0.5)
                 self.Nz=1
                 self.zvect=[-0.5]
@@ -369,7 +369,7 @@ class FloatSet(object):
         # search for nearest neighbors
         dist, neighbor_indices = mask_tree.query(queries_xyz, n_jobs=-1)
         self.ocean_bools = np.take(mask_bool_flat, neighbor_indices.ravel()) # True -> neighbor is tracer ocean
-        print(self.ocean_bools.size)
+        print(self.ocean_bools)
         floats_ocean = floats_geo[:,np.nonzero(self.ocean_bools.astype('int'))].T
         floats_ocean=np.transpose(np.squeeze(floats_ocean))
         if np.all(self.z==-0.5):
@@ -394,7 +394,8 @@ class FloatSet(object):
 
         Nx = self.Nx
         Ny = self.Ny
-        Nt = Nx*Ny
+        Nz=self.Nz
+        Nt = Nx*Ny*Nz
         if type(ds1d) == xr.core.dataarray.DataArray:
             ds1d = ds1d.to_dataset()
         index_dict = {'index': np.arange(1, Nt+1, dtype=np.int32)}
