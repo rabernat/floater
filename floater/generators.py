@@ -107,7 +107,7 @@ class FloatSet(object):
         z : np.ndarray
             1D array of float z coordinates
         """
-        if len(self.zvect)>1:
+        if self.dims==3:
             xx, yy, zz= np.meshgrid(self.x, self.y,self.zvect)
             if self.model_grid is not None:
                 xx, yy, zz = self.subset_floats_from_mask(xx, yy,zz)
@@ -132,7 +132,7 @@ class FloatSet(object):
         z : np.ndarray
             1D array of float z coordinates
         """
-        if len(self.zvect)>1:
+        if self.dims==3:
             xx, yy, zz = self.get_rectmesh()
             # modify to be even-R horizontal offset
             xx[::2] += self.dx/4
