@@ -83,7 +83,7 @@ class FloatSet(object):
             self.y = self.ylim[0] + self.dy * np.arange(self.Ny) + self.dy/2
             if zvect is not None:
                 self.zvect = zvect
-                self.Nz=len(zvect)
+                self.Nz=zvect.size
                 self.dims=3
             else:
                 self.Nz=1
