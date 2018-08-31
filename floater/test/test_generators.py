@@ -66,10 +66,10 @@ def fs_with_land(request):
     xlim, ylim, dx, dy, model_grid = request.param
     return gen.FloatSet(xlim, ylim, dx, dy, model_grid=model_grid)
 
-@pytest.fixture(params=domain_geometries)
+@pytest.fixture(params=domain_geometries_3D)
 def fs_3D(request):
-    xlim, ylim, dx, dy,_ = request.param
-    return gen.FloatSet(xlim, ylim, dx, dy,zvect=np.arange(-100,-1000,-100))
+    xlim, ylim, dx, dy,_ , zvect= request.param
+    return gen.FloatSet(xlim, ylim, dx, dy,zvect=zvect)
 
 @pytest.fixture(params=domain_geometries_3D)
 def fs_3D_with_land(request):
@@ -220,7 +220,7 @@ def test_land_mask(fs_with_land):
     assert len(float_x) > 1
     assert len(float_y) > 1
 
-def test_land_mask(fs_3D_with_land):
+def test_land_mask_3D(fs_3D_with_land):
     """Verifies that the float grid excludes the masked regions properly."""
 
     fs = fs_3D_with_land
