@@ -501,6 +501,7 @@ def convex_contour_around_maximum(data, lx, ly, ji, init_contour_step_frac=0.1,
 
 
 def find_convex_contours(data, lx, ly, min_distance=5, min_area=100., CI_th = -1.0, CI_tol = 0.1, 
+                             convex_def=0.01, convex_def_tol=0.001,
                              init_contour_step_frac=0.1, min_limit_diff=1e-10, max_width=100,
                              use_threadpool=False, lon=None, lat=None,
                              progress=False, **contour_kwargs):
@@ -602,6 +603,7 @@ def find_convex_contours(data, lx, ly, min_distance=5, min_area=100., CI_th = -1
                 del contour_kwargs['proj_kwargs']
 
         contour, area, cd, CI  = convex_contour_around_maximum(data, lx, ly, ji,max_width=max_width,init_contour_step_frac=init_contour_step_frac,                                              min_limit_diff=min_limit_diff,CI_th = CI_th, CI_tol = CI_tol,
+                                             convex_def=convex_def, convex_def_tol=convex_def_tol,
                                              **contour_kwargs)
         if area and (area >= min_area):
             result = ji, contour, area, cd, CI
