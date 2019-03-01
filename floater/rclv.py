@@ -415,6 +415,7 @@ def convex_contour_around_maximum(data, lx, ly, ji, init_contour_step_frac=0.1,
             logger.debug('cd %g is close to target %g within tolerance %g' %
                          (cd, convex_def, convex_def_tol))
             break
+            
 #         elif abs(cd - convex_def) <= convex_def_tol:
 #             logger.debug('cd %g is close to target %g within tolerance %g' %
 #                          (cd, convex_def, convex_def_tol))
