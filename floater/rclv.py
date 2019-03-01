@@ -172,6 +172,56 @@ def contour_area(con):
     return region_area, hull_area, cd
 
 
+def contour_CI(lx, ly, con, ji, border_i, border_j):
+    """Calculate the coherency index of a polygon contour.
+
+    Parameters
+    ----------
+    con : arraylike
+        A 2D array of vertices with shape (N,2) that follows the scikit
+        image conventions (con[:,0] are j indices)
+    ji : tuple
+        The index of the maximum in (j, i) order
+    lx : array_like
+        Array with shape (2,n,n) including the initial and final arrays for x position of particles (position array is n*n, 
+        and trajectories were unwrapped to correct the jump of displacement at the periodic boundaries)
+    ly : array_like
+        Array with shape (2,n,n) including the initial and final arrays for y position of particles (position array is n*n, 
+        and trajectories were unwrapped to correct the jump of displacement at the periodic boundaries) 
+
+    Returns
+    -------
+    coherency index(CI) : float
+    """
+    # the maximum
+    j, i = ji
+    
+    # get the position of the contour
+    con1 = con.copy()
+    con1[:, 0] += (j-border_j[0])
+    con1[:, 1] += (i-border_i[0])
+
+    # label the points in eddy
+    mask = label_points_in_contours(lx[0].shape, [con1])
+    
+    # get the initial and final positions of the particles inside eddy
+    lx_0, ly_0 = lx[0][mask==1], ly[0][mask==1]
+    lx_t, ly_t = lx[1][mask==1], ly[1][mask==1]
+    
+    
+    # find center points 
+    xc_0, yc_0 = np.mean(lx_0), np.mean(ly_0)
+    xc_t, yc_t = np.mean(lx_t), np.mean(ly_t)
+    
+    # calculate variance of eddy particles' positon
+    var_0 = np.mean((lx_0 - xc_0)**2 + (ly_0 - yc_0)**2 )
+    var_t = np.mean((lx_t - xc_t)**2 + (ly_t - yc_t)**2 )
+    
+    CI = (var_0-var_t)/var_0  
+
+    return CI
+
+
 def project_vertices(verts, lon0, lat0, dlon, dlat):
     """Project the logical coordinates of vertices into physical map
     coordiantes.
@@ -207,7 +257,7 @@ def project_vertices(verts, lon0, lat0, dlon, dlat):
 
 
 def find_contour_around_maximum(data, ji, level, border_j=(5,5),
-        border_i=(5,5), max_footprint=None, proj_kwargs={},
+        border_i=(5,5), max_width=100, max_footprint=None, proj_kwargs={},
         periodic=(False, False)):
     j,i = ji
     max_val = data[j,i]
@@ -269,15 +319,17 @@ def find_contour_around_maximum(data, ji, level, border_j=(5,5),
         if target_con is None and not (
               grow_down or grow_up or grow_left or grow_right):
                 raise ValueError("Couldn't find a contour")
+        if (np.array(border_i)>max_width).any() or (np.array(border_j)>max_width).any():   #set a limit on the width of the window
+            raise ValueError("Local region becomes too large.")
 
     return target_con, region_data, border_j, border_i
 
 
-def convex_contour_around_maximum(data, ji, init_contour_step_frac=0.1,
-                                  border=5,
-                                  convex_def=0.01, convex_def_tol=0.001,
+def convex_contour_around_maximum(data, lx, ly, ji, init_contour_step_frac=0.1,
+                                  border=5, max_width=100, 
+                                  CI_th = -1.0, CI_tol = 0.1, convex_def=0.01, convex_def_tol=0.001,
                                   max_footprint=None, proj_kwargs=None,
-                                  periodic=(False, False),
+                                  periodic=(False, False),  #False
                                   max_iters=1000, min_limit_diff=1e-10):
     """Find the largest convex contour around a maximum.
 
@@ -287,15 +339,27 @@ def convex_contour_around_maximum(data, ji, init_contour_step_frac=0.1,
         The 2D data to contour
     ji : tuple
         The index of the maximum in (j, i) order
+    lx : array_like
+        Array with shape (2,n,n) including the initial and final arrays for x position of particles (position array is n*n, 
+        and trajectories were unwrapped to correct the jump of displacement at the periodic boundaries)
+    ly : array_like
+        Array with shape (2,n,n) including the initial and final arrays for y position of particles (position array is n*n, 
+        and trajectories were unwrapped to correct the jump of displacement at the periodic boundaries) 
     init_contour_step_frac : float
         the value with which to increment the initial contour level
         (multiplied by the local maximum value)
     border: int
         the initial window around the maximum
+    max_width: int
+        The maximum width of the search window. Value depends on the resolution of particles
     convex_def : float, optional
         The target convexity deficiency allowed for the contour.
     convex_def_tol : float, optional
         The tolerance for which the convexity deficiency will be sought
+    CI_th : float, optional
+        The target coherency index allowed for the contour. Set it as -np.inf if don't need it.
+    CI_tol : float, optional
+        The tolerance for which the coherency index will be sought
     verbose : bool, optional
         Whether to print out diagnostic information
     proj_kwargs : dict, optional
@@ -331,20 +395,30 @@ def convex_contour_around_maximum(data, ji, init_contour_step_frac=0.1,
     logger.debug("init_contour_step_frac %g" % init_contour_step_frac)
     logger.debug("init_contour_step_size %g" % init_contour_step_size)
 
-    lower_lim = 0
+    lower_lim = 0 #max_value
     upper_lim = 2*init_contour_step_size
     # special logic needed to find the first contour greater than convex_def
-    exceeded = False
+    exceeded = False  #False
+    overlap = False
+    CI = -np.inf
     cd = np.inf
     contour = None
     region_area = None
 
     for n_iter in range(max_iters):
-        logger.debug('iter %g, cd %g' % (n_iter, cd))
-        if abs(cd - convex_def) <= convex_def_tol:
+        logger.debug('iter %g, CI %g, cd %g' % (n_iter, CI,cd))
+#         logger.debug('iter %g, cd %g' % (n_iter, cd))
+        if (abs(CI - CI_th) <= CI_tol) and (abs(cd - convex_def) <= convex_def_tol):
+
+            logger.debug('CI %g is close to target %g within tolerance %g' %
+                         (CI, CI_th, CI_tol))
             logger.debug('cd %g is close to target %g within tolerance %g' %
                          (cd, convex_def, convex_def_tol))
             break
+#         elif abs(cd - convex_def) <= convex_def_tol:
+#             logger.debug('cd %g is close to target %g within tolerance %g' %
+#                          (cd, convex_def, convex_def_tol))
+#             break
 
         # the new contour level to try
         logger.debug('current lims: (%10.20f, %10.20f)' % (lower_lim, upper_lim))
@@ -352,14 +426,19 @@ def convex_contour_around_maximum(data, ji, init_contour_step_frac=0.1,
 
         if (upper_lim - lower_lim) < min_limit_diff:
             logger.debug('limit diff below threshold; ending search')
-            break
+            level = lower_lim   # switch to the lower_lim (cd or CI of lower_lim and upper_lim might have big difference
+                          # although the contour values are very close)
+            overlap = True
+#             if level==0:      #this might be a weird situation
+#                 break
 
+            
         logger.debug(('contouring level: %10.20f border: ' % level)
                      + repr(border_j) + repr(border_i))
         try:
             # try to get a contour
             contour, region_data, border_j, border_i = find_contour_around_maximum(
-                data, (j, i), level, border_j, border_i,
+                data, (j, i), level, border_j, border_i, max_width=max_width,
                 max_footprint=max_footprint, periodic=periodic)
         except ValueError as ve:
             # we will probably be here if the contour search ended up covering
@@ -369,6 +448,9 @@ def convex_contour_around_maximum(data, ji, init_contour_step_frac=0.1,
             #if contour is None:
             upper_lim = level
             exceeded = True
+            
+            if overlap:    # limit diff below threshold; ending search here
+                break                 
             continue
             #else:
             #    break
@@ -380,12 +462,20 @@ def convex_contour_around_maximum(data, ji, init_contour_step_frac=0.1,
             contour_proj = project_vertices(contour, **proj_kwargs)
 
         region_area, hull_area, cd = contour_area(contour_proj)
-        logger.debug('region_area: % 6.1f, hull_area: % 6.1f, convex_def: % 6.5e'
-                     % (region_area, hull_area, cd))
 
+        # get the coherency index
+        CI = contour_CI(lx, ly, contour_proj, ji, border_i, border_j)
+        
+        logger.debug('region_area: % 6.1f, hull_area: % 6.1f, convex_def: % 6.5e, CI: % 6.5e'
+             % (region_area, hull_area, cd, CI))
+        
+        if overlap:
+            break                # limit diff below threshold; ending search here
+            
         # special logic needed to find the first contour greater than convex_def
         if not exceeded:
-            if cd < convex_def:
+            if (CI > CI_th and cd < convex_def):
+#             if cd < convex_def:
                 # need to keep upper_lim until we exceed the convex def
                 lower_lim = level
                 upper_lim = level + 2*init_contour_step_size
@@ -396,7 +486,8 @@ def convex_contour_around_maximum(data, ji, init_contour_step_frac=0.1,
         else:
             # from here we can assume that the target contour lies between
             # lower_lim and_upper_lim
-            if cd < convex_def:
+            if (CI > CI_th and cd < convex_def): 
+#             if cd < convex_def:
                 lower_lim = level
             else:
                 upper_lim = level
@@ -405,19 +496,26 @@ def convex_contour_around_maximum(data, ji, init_contour_step_frac=0.1,
     if contour is not None:
         contour[:, 0] += (j-border_j[0])
         contour[:, 1] += (i-border_i[0])
-    return contour, region_area, cd
+    return contour, region_area, cd, CI
 
 
-def find_convex_contours(data, min_distance=5, min_area=100.,
+def find_convex_contours(data, lx, ly, min_distance=5, min_area=100., CI_th = -1.0, CI_tol = 0.1, 
+                             init_contour_step_frac=0.1, min_limit_diff=1e-10, max_width=100,
                              use_threadpool=False, lon=None, lat=None,
                              progress=False, **contour_kwargs):
     """Find the outermost convex contours around the maxima of
-    data with specified convexity deficiency.
+    data with specified convexity deficiency. 
 
     Parameters
     ----------
     data : array_like
         The 2D data to contour
+    lx : array_like
+        Array with shape (2,n,n) including the initial and final arrays for x position of particles (position array is n*n, 
+        and trajectories were unwrapped to correct the jump of displacement at the periodic boundaries)
+    ly : array_like
+        Array with shape (2,n,n) including the initial and final arrays for y position of particles (position array is n*n, 
+        and trajectories were unwrapped to correct the jump of displacement at the periodic boundaries) 
     min_distance : int, optional
         The minimum distance around maxima (pixel units)
     min_area : float, optional
@@ -431,10 +529,16 @@ def find_convex_contours(data, min_distance=5, min_area=100.,
         (multiplied by the local maximum value)
     border: int
         the initial window around the maximum
+    max_width: int
+        The maximum width of the search window. Value depends on the resolution of particles
     convex_def : float, optional
         The target convexity deficiency allowed for the contour.
     convex_def_tol : float, optional
         The tolerance for which the convexity deficiency will be sought
+    CI_th : float, optional
+        The target coherency index allowed for the contour. Set it as -np.inf if don't need it.
+    CI_tol : float, optional
+        The tolerance for which the coherency index will be sought
     verbose : bool, optional
         Whether to print out diagnostic information
     proj_kwargs : dict, optional
@@ -496,10 +600,10 @@ def find_convex_contours(data, min_distance=5, min_area=100.,
             if 'proj_kwargs' in contour_kwargs:
                 del contour_kwargs['proj_kwargs']
 
-        contour, area, cd = convex_contour_around_maximum(data, ji,
-                                **contour_kwargs)
+        contour, area, cd, CI  = convex_contour_around_maximum(data, lx, ly, ji,max_width=max_width,init_contour_step_frac=init_contour_step_frac,                                              min_limit_diff=min_limit_diff,CI_th = CI_th, CI_tol = CI_tol,
+                                             **contour_kwargs)
         if area and (area >= min_area):
-            result = ji, contour, area, cd
+            result = ji, contour, area, cd, CI
         toc = time()
         logger.debug("point " + repr(tuple(ji)) + " took %g s" % (toc-tic))
         return result
