@@ -172,7 +172,7 @@ def contour_area(con):
     return region_area, hull_area, cd
 
 
-def contour_CI(lx, ly, con, ji, border_i, border_j):
+def contour_CI(lx, ly, con, ji, region_area, dx, border_i, border_j):
     """Calculate the coherency index of a polygon contour.
 
     Parameters
@@ -183,11 +183,15 @@ def contour_CI(lx, ly, con, ji, border_i, border_j):
     ji : tuple
         The index of the maximum in (j, i) order
     lx : array_like
-        Array with shape (2,n,n) including the initial and final arrays for x position of particles (position array is n*n, 
+        Array with shape (N,n,n) including the x position of particles at N time steps(position array is n*n, 
         and trajectories were unwrapped to correct the jump of displacement at the periodic boundaries)
     ly : array_like
-        Array with shape (2,n,n) including the initial and final arrays for y position of particles (position array is n*n, 
-        and trajectories were unwrapped to correct the jump of displacement at the periodic boundaries) 
+        Array with shape (N,n,n) including the y position of particles at N time steps(position array is n*n, 
+        and trajectories were unwrapped to correct the jump of displacement at the periodic boundaries)
+    region_area : float
+        Area of a polygon contour
+    dx : float
+        Particle spacing
 
     Returns
     -------
@@ -204,20 +208,17 @@ def contour_CI(lx, ly, con, ji, border_i, border_j):
     # label the points in eddy
     mask = label_points_in_contours(lx[0].shape, [con1])
     
-    # get the initial and final positions of the particles inside eddy
-    lx_0, ly_0 = lx[0][mask==1], ly[0][mask==1]
-    lx_t, ly_t = lx[1][mask==1], ly[1][mask==1]
+    # get the positions of particles inside the eddy at each time
+    lx_p, ly_p = lx[:,mask==1], ly[:,mask==1]
     
+    # calculate variance of particle positons at each time
+    var_p = np.var(lx_p,axis=-1) + np.var(ly_p,axis=-1)
     
-    # find center points 
-    xc_0, yc_0 = np.mean(lx_0), np.mean(ly_0)
-    xc_t, yc_t = np.mean(lx_t), np.mean(ly_t)
-    
-    # calculate variance of eddy particles' positon
-    var_0 = np.mean((lx_0 - xc_0)**2 + (ly_0 - yc_0)**2 )
-    var_t = np.mean((lx_t - xc_t)**2 + (ly_t - yc_t)**2 )
-    
-    CI = (var_0-var_t)/var_0  
+    # calculate the minimum variance of particle postions
+    area1 = region_area*dx**2  # the real area of a polygon contour
+    var_min = area1/(2*np.pi)
+
+    CI = (var_min - np.max(var_p))/var_min  
 
     return CI
 
@@ -325,7 +326,7 @@ def find_contour_around_maximum(data, ji, level, border_j=(5,5),
     return target_con, region_data, border_j, border_i
 
 
-def convex_contour_around_maximum(data, lx, ly, ji, init_contour_step_frac=0.1,
+def convex_contour_around_maximum(data, lx, ly, ji, dx, init_contour_step_frac=0.1,
                                   border=5, max_width=100, 
                                   CI_th = -1.0, CI_tol = 0.1, convex_def=0.01, convex_def_tol=0.001,
                                   max_footprint=None, proj_kwargs=None,
@@ -340,11 +341,13 @@ def convex_contour_around_maximum(data, lx, ly, ji, init_contour_step_frac=0.1,
     ji : tuple
         The index of the maximum in (j, i) order
     lx : array_like
-        Array with shape (2,n,n) including the initial and final arrays for x position of particles (position array is n*n, 
+        Array with shape (N,n,n) including the x position of particles at N time steps(position array is n*n, 
         and trajectories were unwrapped to correct the jump of displacement at the periodic boundaries)
     ly : array_like
-        Array with shape (2,n,n) including the initial and final arrays for y position of particles (position array is n*n, 
-        and trajectories were unwrapped to correct the jump of displacement at the periodic boundaries) 
+        Array with shape (N,n,n) including the y position of particles at N time steps(position array is n*n, 
+        and trajectories were unwrapped to correct the jump of displacement at the periodic boundaries)
+    dx : float
+        Particle spacing
     init_contour_step_frac : float
         the value with which to increment the initial contour level
         (multiplied by the local maximum value)
@@ -430,8 +433,8 @@ def convex_contour_around_maximum(data, lx, ly, ji, init_contour_step_frac=0.1,
             level = lower_lim   # switch to the lower_lim (cd or CI of lower_lim and upper_lim might have big difference
                           # although the contour values are very close)
             overlap = True
-#             if level==0:      #this might be a weird situation
-#                 break
+            if level==0:      #this might be a weird situation
+                break
 
             
         logger.debug(('contouring level: %10.20f border: ' % level)
@@ -465,13 +468,23 @@ def convex_contour_around_maximum(data, lx, ly, ji, init_contour_step_frac=0.1,
         region_area, hull_area, cd = contour_area(contour_proj)
 
         # get the coherency index
-        CI = contour_CI(lx, ly, contour_proj, ji, border_i, border_j)
+        CI = contour_CI(lx, ly,contour_proj, ji, region_area, dx, border_i, border_j)
         
         logger.debug('region_area: % 6.1f, hull_area: % 6.1f, convex_def: % 6.5e, CI: % 6.5e'
              % (region_area, hull_area, cd, CI))
         
         if overlap:
-            break                # limit diff below threshold; ending search here
+            if (CI > CI_th and cd < convex_def):
+                break                # limit diff below threshold; ending search here
+            else:
+                border_j = (border, border)
+                border_i = (border, border)
+                continue
+
+            
+#         if exceeded and (region_area < 2):          # contous area is too small; ending search here
+#             logger.debug('contour area is too small')
+#             break
             
         # special logic needed to find the first contour greater than convex_def
         if not exceeded:
@@ -500,10 +513,10 @@ def convex_contour_around_maximum(data, lx, ly, ji, init_contour_step_frac=0.1,
     return contour, region_area, cd, CI
 
 
-def find_convex_contours(data, lx, ly, min_distance=5, min_area=100., CI_th = -1.0, CI_tol = 0.1, 
+def find_convex_contours(data, lx, ly, dx, min_distance=5, min_area=100., CI_th = -1.0, CI_tol = 0.1,
                              convex_def=0.01, convex_def_tol=0.001,
                              init_contour_step_frac=0.1, min_limit_diff=1e-10, max_width=100,
-                             use_threadpool=False, lon=None, lat=None,
+                             use_threadpool=False, lon=None, lat=None,  #use_multi_process=False,
                              progress=False, **contour_kwargs):
     """Find the outermost convex contours around the maxima of
     data with specified convexity deficiency. 
@@ -513,11 +526,13 @@ def find_convex_contours(data, lx, ly, min_distance=5, min_area=100., CI_th = -1
     data : array_like
         The 2D data to contour
     lx : array_like
-        Array with shape (2,n,n) including the initial and final arrays for x position of particles (position array is n*n, 
+        Array with shape (N,n,n) including the x position of particles at N time steps(position array is n*n, 
         and trajectories were unwrapped to correct the jump of displacement at the periodic boundaries)
     ly : array_like
-        Array with shape (2,n,n) including the initial and final arrays for y position of particles (position array is n*n, 
-        and trajectories were unwrapped to correct the jump of displacement at the periodic boundaries) 
+        Array with shape (N,n,n) including the y position of particles at N time steps(position array is n*n, 
+        and trajectories were unwrapped to correct the jump of displacement at the periodic boundaries)
+    dx : float
+        Particle spacing
     min_distance : int, optional
         The minimum distance around maxima (pixel units)
     min_area : float, optional
@@ -580,6 +595,10 @@ def find_convex_contours(data, lx, ly, min_distance=5, min_area=100., CI_th = -1
         from multiprocessing.pool import ThreadPool
         pool = ThreadPool()
         map_function = pool.imap_unordered
+#     if use_multi_process:
+#         from pathos.multiprocessing import ProcessingPool as Pool
+#         #map_function = Pool(processes = 4).imap_unordered
+#         map_function = Pool().uimap
     else:
         try:
             from itertools import imap
@@ -602,7 +621,9 @@ def find_convex_contours(data, lx, ly, min_distance=5, min_area=100., CI_th = -1
             if 'proj_kwargs' in contour_kwargs:
                 del contour_kwargs['proj_kwargs']
 
-        contour, area, cd, CI  = convex_contour_around_maximum(data, lx, ly, ji,max_width=max_width,init_contour_step_frac=init_contour_step_frac,                                              min_limit_diff=min_limit_diff,CI_th = CI_th, CI_tol = CI_tol,
+        contour, area, cd, CI  = convex_contour_around_maximum(data, lx, ly, ji, dx=dx,
+                                             max_width=max_width,init_contour_step_frac=init_contour_step_frac,
+                                             min_limit_diff=min_limit_diff,CI_th = CI_th, CI_tol = CI_tol,
                                              convex_def=convex_def, convex_def_tol=convex_def_tol,
                                              **contour_kwargs)
         if area and (area >= min_area):
