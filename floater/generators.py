@@ -184,7 +184,7 @@ class FloatSet(object):
             return dx * dy
 
     def to_mitgcm_format(self, filename, tstart=0, iup=0, mesh='rect',
-                         read_binary_prec=64):
+                         read_binary_prec=64,kfloat=-0.5,itop=0):
         """Output floatset data in MITgcm format
 
         PARAMETERS
@@ -244,10 +244,10 @@ class FloatSet(object):
         #kpart = -0.5
 
         # kfloat: target level of float (??)
-        kfloat = -0.5
+        #kfloat = -0.5
 
         # itop: time of float at the surface (in s)
-        itop = 0
+        #itop = 0
         
         # end time of integration of float (in s); note if tend = 1 floats are
         # integrated till the end of the integration;

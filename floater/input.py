@@ -36,15 +36,24 @@ class MITgcmFloatData(object):
         self._buf_dim = buf_dim
         self._dtype = file_dtype
 
-        # map buffer lengths to knowledge about MITgcm float output format
-        assert self._buf_dim in [8, 13, 14]
-        self.fields = ['npart', 'time', 'x', 'y', 'z', 'i', 'j', 'k']
-        if buf_dim >= 8:
-            self.fields += ['p', 'u', 'v', 't', 's']
-        if buf_dim >= 14:
-            self.fields += ['vort']
+        if file_prefix == 'float_trajectories':
+             # map buffer lengths to knowledge about MITgcm float output format
+             assert self._buf_dim in [8, 13, 14]
+             self.fields = ['npart', 'time', 'x', 'y', 'z', 'i', 'j', 'k']
+             if buf_dim >= 9:
+                 self.fields += ['p', 'u', 'v', 't', 's']
+             if buf_dim >= 14:
+                 self.fields += ['vort']
+        elif file_prefix == 'float_profiles':
+            self.fields = ['npart', 'time', 'x', 'y', 'z', 'i', 'j', 'k','etaN']
+            dummylist=list(map(str, np.arange(1,(buf_dim-8)/4).astype(int)))
+            self.fields += ['u' + s for s in dummylist]
+            self.fields += ['v' + s for s in dummylist]
+            self.fields += ['t' + s for s in dummylist]
+            self.fields += ['s' + s for s in dummylist]
+        else:
+            raise RuntimeError('Unrecognized file_prefix: must be float_profiles or float_trajectories')
         self._bytes_per_float = self._buf_dim * self._dtype.itemsize
-
         # examine input files
         self.files = glob.glob(os.path.join(
                         self._data_path, self._file_prefix + '*.data'))
