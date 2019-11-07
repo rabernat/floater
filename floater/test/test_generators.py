@@ -449,3 +449,30 @@ def _actually_do_mitgcm_check_3D(single_fs, tmpdir, prec=32):
             # the actual number of floats                                       
             array = array.reshape(-1,9)
             assert int(array[0,0]) == num_floats
+
+            
+def _actually_do_mitgcm_check_prof(single_fs, tmpdir, prec=32):
+    fs = single_fs
+    for mesh in ['rect', 'hex']:
+        if mesh=='rect':
+            xx, yy = fs.get_rectmesh()
+        else:
+            xx, yy = fs.get_hexmesh()
+        num_floats = len(xx.ravel())
+        for iup in [-1, 0, 1]:
+            itop=900
+            kfloat=20.5
+            filename = str(tmpdir.join('ini_flt_pos_%s_%g.bin' % (mesh, iup)))
+            fs.to_mitgcm_format(filename, mesh=mesh, iup=iup,
+                                read_binary_prec=prec, kfloat=kfloat, itop=itop)
+            # check the file exists
+            assert os.path.exists(filename)
+            # check the file has the correct length
+            array = np.fromfile(filename, dtype='>f%g' % (prec/8))
+            assert len(array)==(num_floats + 1 )* 9
+            assert array.reshape(-1,9)[1,5]==kfloat
+            assert array.reshape(-1,9)[1,7]==itop
+            # check that the number of floats written to the file matches
+            # the actual number of floats
+            array = array.reshape(-1,9)
+            assert int(array[0,0]) == num_floats
