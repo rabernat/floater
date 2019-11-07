@@ -276,6 +276,9 @@ def test_to_mitgcm_format(fs_all, tmpdir):
 
 def test_to_mitgcm_format_3D(fs_3D_with_land, tmpdir):
     _actually_do_mitgcm_check_3D(fs_3D_with_land, tmpdir)
+    
+def test_to_mitgcm_format_prof(fs_3D_with_land, tmpdir):
+    _actually_do_mitgcm_check_prof(fs_3D_with_land, tmpdir)
 
 def test_pickling(fs, tmpdir):
     filename = str(tmpdir.join('pickled_floatset.pkl'))
@@ -455,9 +458,9 @@ def _actually_do_mitgcm_check_prof(single_fs, tmpdir, prec=32):
     fs = single_fs
     for mesh in ['rect', 'hex']:
         if mesh=='rect':
-            xx, yy = fs.get_rectmesh()
+            xx, yy, zz = fs.get_rectmesh()
         else:
-            xx, yy = fs.get_hexmesh()
+            xx, yy, zz = fs.get_hexmesh()
         num_floats = len(xx.ravel())
         for iup in [-1, 0, 1]:
             itop=900
