@@ -172,7 +172,7 @@ def contour_area(con):
     return region_area, hull_area, cd
 
 
-def contour_CI(lx, ly, con, ji, region_area, dx, border_i, border_j):
+def contour_CI(lx, ly, con, ji, region_area, dx, dy, border_i, border_j):
     """Calculate the coherency index of a polygon contour.
 
     Parameters
@@ -190,8 +190,8 @@ def contour_CI(lx, ly, con, ji, region_area, dx, border_i, border_j):
         and trajectories were unwrapped to correct the jump of displacement at the periodic boundaries)
     region_area : float
         Area of a polygon contour
-    dx : float
-        Particle spacing
+    dx, dy : float
+        Particle spacings in x and y directions, must have the same units as lx and ly, respectively.
 
     Returns
     -------
@@ -215,7 +215,7 @@ def contour_CI(lx, ly, con, ji, region_area, dx, border_i, border_j):
     var_p = np.var(lx_p,axis=-1) + np.var(ly_p,axis=-1)
     
     # calculate the minimum variance of particle postions
-    area1 = region_area*dx**2  # the real area of a polygon contour
+    area1 = region_area*dx*dy  # the real area of a polygon contour
     var_min = area1/(2*np.pi)
 
     CI = (var_min - np.max(var_p))/var_min  
@@ -326,7 +326,7 @@ def find_contour_around_maximum(data, ji, level, border_j=(5,5),
     return target_con, region_data, border_j, border_i
 
 
-def convex_contour_around_maximum(data, lx, ly, ji, dx, init_contour_step_frac=0.1,
+def convex_contour_around_maximum(data, lx, ly, ji, dx, dy, init_contour_step_frac=0.1,
                                   border=5, max_width=100, 
                                   CI_th = -1.0, CI_tol = 0.1, convex_def=0.01, convex_def_tol=0.001,
                                   max_footprint=None, proj_kwargs=None,
@@ -346,8 +346,8 @@ def convex_contour_around_maximum(data, lx, ly, ji, dx, init_contour_step_frac=0
     ly : array_like
         Array with shape (N,n,n) including the y position of particles at N time steps(position array is n*n, 
         and trajectories were unwrapped to correct the jump of displacement at the periodic boundaries)
-    dx : float
-        Particle spacing
+    dx, dy : float
+        Particle spacings in x and y directions, must have the same units as lx and ly, respectively.
     init_contour_step_frac : float
         the value with which to increment the initial contour level
         (multiplied by the local maximum value)
@@ -468,7 +468,7 @@ def convex_contour_around_maximum(data, lx, ly, ji, dx, init_contour_step_frac=0
         region_area, hull_area, cd = contour_area(contour_proj)
 
         # get the coherency index
-        CI = contour_CI(lx, ly,contour_proj, ji, region_area, dx, border_i, border_j)
+        CI = contour_CI(lx, ly,contour_proj, ji, region_area, dx, dy, border_i, border_j)
         
         logger.debug('region_area: % 6.1f, hull_area: % 6.1f, convex_def: % 6.5e, CI: % 6.5e'
              % (region_area, hull_area, cd, CI))
@@ -513,7 +513,7 @@ def convex_contour_around_maximum(data, lx, ly, ji, dx, init_contour_step_frac=0
     return contour, region_area, cd, CI
 
 
-def find_convex_contours(data, lx, ly, dx, min_distance=5, min_area=100., CI_th = -1.0, CI_tol = 0.1,
+def find_convex_contours(data, lx, ly, dx, dy, min_distance=5, min_area=100., CI_th = -1.0, CI_tol = 0.1,
                              convex_def=0.01, convex_def_tol=0.001,
                              init_contour_step_frac=0.1, min_limit_diff=1e-10, max_width=100,
                              use_threadpool=False, lon=None, lat=None,  #use_multi_process=False,
@@ -531,8 +531,8 @@ def find_convex_contours(data, lx, ly, dx, min_distance=5, min_area=100., CI_th 
     ly : array_like
         Array with shape (N,n,n) including the y position of particles at N time steps(position array is n*n, 
         and trajectories were unwrapped to correct the jump of displacement at the periodic boundaries)
-    dx : float
-        Particle spacing
+    dx, dy : float
+        Particle spacings in x and y directions, must have the same units as lx and ly, respectively.
     min_distance : int, optional
         The minimum distance around maxima (pixel units)
     min_area : float, optional
@@ -621,7 +621,7 @@ def find_convex_contours(data, lx, ly, dx, min_distance=5, min_area=100., CI_th 
             if 'proj_kwargs' in contour_kwargs:
                 del contour_kwargs['proj_kwargs']
 
-        contour, area, cd, CI  = convex_contour_around_maximum(data, lx, ly, ji, dx=dx,
+        contour, area, cd, CI  = convex_contour_around_maximum(data, lx, ly, ji, dx=dx, dy=dy,
                                              max_width=max_width,init_contour_step_frac=init_contour_step_frac,
                                              min_limit_diff=min_limit_diff,CI_th = CI_th, CI_tol = CI_tol,
                                              convex_def=convex_def, convex_def_tol=convex_def_tol,
